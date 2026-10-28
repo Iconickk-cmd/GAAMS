@@ -1,0 +1,35 @@
+
+# .NET build output
+**/bin/
+**/obj/
+
+# Visual Studio local files
+.vs/
+*.user
+*.suo
+
+# Angular dependencies and build output
+**/node_modules/
+**/dist/
+**/.angular/
+
+
+# Local environment and secret configuration
+.env
+.env.*
+!.env.example
+**/appsettings.json
+!**/appsettings.example.json
+**/appsettings.Development.json
+**/appsettings.Local.json
+secrets.json
+
+# Logs
+*.log
+
+# Operating system files
+.DS_Store
+Thumbs.db
+
+# Local API test requests may contain personal or test data
+**/*.http

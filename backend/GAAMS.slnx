@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="GAAMS.API/GAAMS.API.csproj" />
+  <Project Path="GAAMS.Application/GAAMS.Application.csproj" />
+  <Project Path="GAAMS.Domain/GAAMS.Domain.csproj" />
+  <Project Path="GAAMS.Infrastructure/GAAMS.Infrastructure.csproj" />
+</Solution>
