@@ -53,6 +53,13 @@ public class GAAMSDbContext : DbContext
                 .IsRequired()
                 .HasMaxLength(100);
 
+            entity.Property(e => e.DateOfBirth)
+                .HasColumnType("date");
+
+            entity.Property(e => e.DateOfEmployment)
+                .HasColumnType("date");
+
+
             entity.HasIndex(e => e.NationalId)
                 .IsUnique()
                 .HasFilter("\"NationalId\" IS NOT NULL");
