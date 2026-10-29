@@ -38,6 +38,7 @@ public class UpdateEmployeeRequest
     [Required]
     [DataType(DataType.Date)]
     [NotInFuture]
+    [EmploymentDate]
     public DateTime DateOfEmployment { get; set; }
 
     [StringLength(100)]
