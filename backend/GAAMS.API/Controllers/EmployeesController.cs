@@ -18,18 +18,127 @@ public class EmployeesController : ControllerBase
         _context = context;
     }
 
+
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<Employee>>> GetEmployees()
+    public async Task<IActionResult> GetEmployees(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10,
+        [FromQuery] string? search = null,
+        [FromQuery] int? departmentId = null,
+        [FromQuery] bool? isActive = null,
+        [FromQuery] string sortBy = "lastName")
+
+
     {
-        var employees = await _context.Employees
+        if (page < 1)
+        {
+            return BadRequest(new
+            {
+                message = "Page must be greater than or equal to 1."
+            });
+        }
+
+        if (pageSize < 1 || pageSize > 100)
+        {
+            return BadRequest(new
+            {
+                message = "Page size must be between 1 and 100."
+            });
+        }
+
+
+        var query = _context.Employees
+            .AsNoTracking()
             .Include(e => e.Department)
-            .OrderBy(e => e.LastName)
-            .ThenBy(e => e.FirstName)
+            .AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var searchTerm = search.Trim();
+
+            query = query.Where(e =>
+                e.FirstName.Contains(searchTerm) ||
+                e.LastName.Contains(searchTerm) ||
+                e.EmployeeNumber.Contains(searchTerm) ||
+                (e.NationalId != null && e.NationalId.Contains(searchTerm)) ||
+                (e.Email != null && e.Email.Contains(searchTerm)));
+        }
+
+        if (departmentId.HasValue)
+        {
+            if (departmentId.Value < 1)
+            {
+                return BadRequest(new
+                {
+                    message = "Department ID must be greater than or equal to 1."
+                });
+            }
+
+            query = query.Where(e => e.DepartmentId == departmentId.Value);
+        }
+
+        if (isActive.HasValue)
+        {
+            query = query.Where(e => e.IsActive == isActive.Value);
+        }
+
+        var totalCount = await query.CountAsync();
+
+
+        switch (sortBy.Trim().ToLowerInvariant())
+        {
+            case "firstname":
+                query = query
+                    .OrderBy(e => e.FirstName)
+                    .ThenBy(e => e.LastName)
+                    .ThenBy(e => e.Id);
+                break;
+
+            case "employeenumber":
+                query = query
+                    .OrderBy(e => e.EmployeeNumber)
+                    .ThenBy(e => e.Id);
+                break;
+
+            case "dateofemployment":
+                query = query
+                    .OrderBy(e => e.DateOfEmployment)
+                    .ThenBy(e => e.Id);
+                break;
+
+            case "lastname":
+                query = query
+                    .OrderBy(e => e.LastName)
+                    .ThenBy(e => e.FirstName)
+                    .ThenBy(e => e.Id);
+                break;
+
+            default:
+                return BadRequest(new
+                {
+                    message = "Invalid sortBy value. Use lastName, firstName, employeeNumber, or dateOfEmployment."
+                });
+        }
+
+
+
+        var employees = await query
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .ToListAsync();
 
-        return Ok(employees);
+        return Ok(new
+        {
+            page,
+            pageSize,
+            totalCount,
+            totalPages = (int)Math.Ceiling(
+                totalCount / (double)pageSize),
+            employees
+        });
     }
-        [HttpGet("{id}")]
+
+    [HttpGet("{id}")]
     public async Task<ActionResult<Employee>> GetEmployee(int id)
     {
         var employee = await _context.Employees
