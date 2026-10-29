@@ -1,5 +1,4 @@
-﻿
-using System.Net;
+﻿using System.Net;
 using System.Net.Http.Json;
 using Xunit;
 
@@ -15,9 +14,12 @@ public class EmployeeDuplicateIntegrationTests
 
         var departmentId = await CreateDepartmentAsync(client);
 
+        var employeeNumber = $"GAAMS-TEST-{Guid.NewGuid():N}";
+        var nationalId = $"N-{Guid.NewGuid():N}".Substring(0, 20);
+
         var firstEmployee = CreateEmployeeRequest(
-            "GAAMS-TEST-001",
-            "National-TEST-001",
+            employeeNumber,
+            nationalId,
             departmentId);
 
         var firstResponse = await client.PostAsJsonAsync(
@@ -27,13 +29,16 @@ public class EmployeeDuplicateIntegrationTests
         Assert.Equal(HttpStatusCode.Created, firstResponse.StatusCode);
 
         var duplicateEmployee = CreateEmployeeRequest(
-            "GAAMS-TEST-001",
-            "National-TEST-002",
+            employeeNumber,
+             $"N-{Guid.NewGuid():N}".Substring(0, 20),
             departmentId);
 
         var duplicateResponse = await client.PostAsJsonAsync(
             "/api/employees",
             duplicateEmployee);
+
+        Console.WriteLine($"Duplicate employee response: {(int)duplicateResponse.StatusCode}");
+        Console.WriteLine(await duplicateResponse.Content.ReadAsStringAsync());
 
         Assert.Equal(HttpStatusCode.Conflict, duplicateResponse.StatusCode);
     }
@@ -46,9 +51,12 @@ public class EmployeeDuplicateIntegrationTests
 
         var departmentId = await CreateDepartmentAsync(client);
 
+        var employeeNumber = $"GAAMS-TEST-{Guid.NewGuid():N}";
+        var nationalId = $"N-{Guid.NewGuid():N}".Substring(0, 20);
+
         var firstEmployee = CreateEmployeeRequest(
-            "GAAMS-TEST-002",
-            "National-TEST-003",
+            employeeNumber,
+            nationalId,
             departmentId);
 
         var firstResponse = await client.PostAsJsonAsync(
@@ -58,8 +66,8 @@ public class EmployeeDuplicateIntegrationTests
         Assert.Equal(HttpStatusCode.Created, firstResponse.StatusCode);
 
         var duplicateEmployee = CreateEmployeeRequest(
-            "GAAMS-TEST-003",
-            "National-TEST-003",
+            $"GAAMS-TEST-{Guid.NewGuid():N}",
+            nationalId,
             departmentId);
 
         var duplicateResponse = await client.PostAsJsonAsync(
@@ -67,6 +75,66 @@ public class EmployeeDuplicateIntegrationTests
             duplicateEmployee);
 
         Assert.Equal(HttpStatusCode.Conflict, duplicateResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task UpdateEmployee_WithValidData_ReturnsUpdatedEmployee()
+    {
+        using var factory = new GAAMSTestFactory();
+        using var client = factory.CreateClient();
+
+        var departmentId = await CreateDepartmentAsync(client);
+
+        var employeeNumber = $"GAAMS-UPDATE-{Guid.NewGuid():N}";
+        var nationalId = $"N-{Guid.NewGuid():N}".Substring(0, 20);
+
+        var createRequest = CreateEmployeeRequest(
+            employeeNumber,
+            nationalId,
+            departmentId);
+
+        var createResponse = await client.PostAsJsonAsync(
+            "/api/employees",
+            createRequest);
+
+        Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
+
+        var createdEmployee =
+            await createResponse.Content.ReadFromJsonAsync<EmployeeResponse>();
+
+        Assert.NotNull(createdEmployee);
+
+        var updateRequest = new
+        {
+            employeeNumber,
+            firstName = "Updated",
+            lastName = "Employee",
+            nationalId,
+            email = "updated.employee@gaams.local",
+            phoneNumber = "0712345678",
+            dateOfBirth = "1990-05-10",
+            dateOfEmployment = "2020-01-15",
+            jobTitle = "Updated Test Officer",
+            departmentId,
+            isActive = true
+        };
+
+        var updateResponse = await client.PutAsJsonAsync(
+            $"/api/employees/{createdEmployee.Id}",
+            updateRequest);
+
+        Assert.Equal(HttpStatusCode.OK, updateResponse.StatusCode);
+
+        var updatedEmployee =
+            await updateResponse.Content.ReadFromJsonAsync<EmployeeResponse>();
+
+        Assert.NotNull(updatedEmployee);
+        Assert.Equal("Updated", updatedEmployee.FirstName);
+        Assert.Equal("Employee", updatedEmployee.LastName);
+        Assert.Equal("Updated Test Officer", updatedEmployee.JobTitle);
+        Assert.Equal("updated.employee@gaams.local", updatedEmployee.Email);
+        Assert.Equal(departmentId, updatedEmployee.DepartmentId);
+        Assert.True(updatedEmployee.IsActive);
     }
 
     private static async Task<int> CreateDepartmentAsync(HttpClient client)
@@ -85,7 +153,8 @@ public class EmployeeDuplicateIntegrationTests
 
         response.EnsureSuccessStatusCode();
 
-        var result = await response.Content.ReadFromJsonAsync<DepartmentResponse>();
+        var result =
+            await response.Content.ReadFromJsonAsync<DepartmentResponse>();
 
         Assert.NotNull(result);
 
@@ -115,5 +184,16 @@ public class EmployeeDuplicateIntegrationTests
     private sealed class DepartmentResponse
     {
         public int Id { get; set; }
+    }
+
+    private sealed class EmployeeResponse
+    {
+        public int Id { get; set; }
+        public string FirstName { get; set; } = string.Empty;
+        public string LastName { get; set; } = string.Empty;
+        public string? JobTitle { get; set; }
+        public string? Email { get; set; }
+        public int DepartmentId { get; set; }
+        public bool IsActive { get; set; }
     }
 }
