@@ -15,12 +15,14 @@ public class EmployeeListIntegrationTests
 
         var departmentId = await CreateDepartmentAsync(client);
 
-        await CreateEmployeeAsync(client, departmentId, "GAAMS-PAGE-A", "Alice", "Able");
-        await CreateEmployeeAsync(client, departmentId, "GAAMS-PAGE-B", "Brian", "Baker");
-        await CreateEmployeeAsync(client, departmentId, "GAAMS-PAGE-C", "Carol", "Clark");
+        var prefix = $"GAAMS-PAGE-{Guid.NewGuid():N}";
+
+        await CreateEmployeeAsync(client, departmentId, $"{prefix}-A", "Alice", "Able");
+        await CreateEmployeeAsync(client, departmentId, $"{prefix}-B", "Brian", "Baker");
+        await CreateEmployeeAsync(client, departmentId, $"{prefix}-C", "Carol", "Clark");
 
         var response = await client.GetAsync(
-            "/api/employees?page=1&pageSize=2&search=GAAMS-PAGE-&sortBy=employeeNumber");
+         $"/api/employees?page=1&pageSize=2&search={prefix}&sortBy=employeeNumber");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
@@ -32,8 +34,8 @@ public class EmployeeListIntegrationTests
         Assert.Equal(3, result.TotalCount);
         Assert.Equal(2, result.TotalPages);
         Assert.Equal(2, result.Employees.Count);
-        Assert.Equal("GAAMS-PAGE-A", result.Employees[0].EmployeeNumber);
-        Assert.Equal("GAAMS-PAGE-B", result.Employees[1].EmployeeNumber);
+        Assert.Equal($"{prefix}-A", result.Employees[0].EmployeeNumber);
+        Assert.Equal($"{prefix}-B", result.Employees[1].EmployeeNumber);
     }
 
     [Fact]
