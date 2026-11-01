@@ -151,7 +151,16 @@ public class EmployeeDuplicateIntegrationTests
             "/api/departments",
             department);
 
-        response.EnsureSuccessStatusCode();
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorBody = await response.Content.ReadAsStringAsync();
+
+            Console.WriteLine($"Create department failed: {(int)response.StatusCode}");
+            Console.WriteLine(errorBody);
+
+            throw new Exception(
+                $"Create department failed with status {(int)response.StatusCode}: {errorBody}");
+        }
 
         var result =
             await response.Content.ReadFromJsonAsync<DepartmentResponse>();
