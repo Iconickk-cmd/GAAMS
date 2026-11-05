@@ -1,0 +1,219 @@
+
+<div class="hr-page">
+
+  <header class="hr-header">
+    <div>
+      <a routerLink="/" class="back-link">← Back to Dashboard</a>
+      <p class="eyebrow">GAAMS / HUMAN RESOURCES</p>
+      <h1>Human Resources Management</h1>
+      <p class="subtitle">
+        Central workspace for managing airport personnel, workforce
+        administration and employee services.
+      </p>
+    </div>
+
+    <button type="button"
+            class="refresh-button"
+            [disabled]="loading()"
+            (click)="loadOverview()">
+      {{ loading() ? 'Refreshing...' : '↻ Refresh Overview' }}
+    </button>
+  </header>
+
+  @if (errorMessage()) {
+  <div class="message error-message" role="alert">
+    {{ errorMessage() }}
+  </div>
+  }
+
+  <section class="hr-stats" aria-label="Human Resources statistics">
+
+    <article class="hr-stat-card">
+      <span class="stat-label">TOTAL EMPLOYEES</span>
+      <strong class="stat-number">{{ totalEmployees() ?? '—' }}</strong>
+      <span class="stat-description">Registered workforce records</span>
+    </article>
+
+    <article class="hr-stat-card">
+      <span class="stat-label">ACTIVE EMPLOYEES</span>
+      <strong class="stat-number active-number">{{ activeEmployees() ?? '—' }}</strong>
+      <span class="stat-description">Active employee records</span>
+    </article>
+
+    <article class="hr-stat-card">
+      <span class="stat-label">INACTIVE EMPLOYEES</span>
+      <strong class="stat-number inactive-number">{{ inactiveEmployees() ?? '—' }}</strong>
+      <span class="stat-description">Inactive employee records</span>
+    </article>
+
+    <article class="hr-stat-card">
+      <span class="stat-label">DEPARTMENTS</span>
+      <strong class="stat-number">{{ totalDepartments() ?? '—' }}</strong>
+      <span class="stat-description">Registered organizational departments</span>
+    </article>
+
+  </section>
+
+  <section class="hr-section">
+
+    <div class="section-heading">
+      <div>
+        <p class="eyebrow">HR SOLUTION AREA</p>
+        <h2>Human Resources Management Modules</h2>
+        <p>
+          Select a functional area to access its workspace.
+        </p>
+      </div>
+    </div>
+
+    <div class="hr-module-grid">
+
+      <!-- 01: Employee and Position Register -->
+      <a routerLink="/positions" class="hr-module-card">
+        <span class="module-number">01</span>
+        <span class="module-content">
+          <strong>Employee &amp; Position Register</strong>
+          <small>
+            Employee records, positions, job titles and employment details.
+          </small>
+        </span>
+        <span class="module-arrow">→</span>
+      </a>
+
+      <!-- 02: Performance and Development Plans -->
+      <article class="hr-module-card planned-card">
+        <span class="module-number">02</span>
+        <span class="module-content">
+          <strong>Performance &amp; Development Plans</strong>
+          <small>
+            Performance appraisals, employee goals and development plans.
+          </small>
+        </span>
+        <span class="planned-label">Planned</span>
+      </article>
+
+      <!-- 03: Leave and Workforce Requests -->
+      <a routerLink="/leave-management" class="hr-module-card">
+        <span class="module-number">03</span>
+        <span class="module-content">
+          <strong>Leave &amp; Workforce Requests</strong>
+          <small>
+            Leave applications, approvals, balances and workforce requests.
+          </small>
+        </span>
+        <span class="module-arrow">→</span>
+      </a>
+
+      <!-- 04: Learning and Training -->
+      <article class="hr-module-card planned-card">
+        <span class="module-number">04</span>
+        <span class="module-content">
+          <strong>Learning &amp; Training</strong>
+          <small>
+            Training programmes, attendance and employee certifications.
+          </small>
+        </span>
+        <span class="planned-label">Planned</span>
+      </article>
+
+      <!-- 05: Competency Management -->
+      <article class="hr-module-card planned-card">
+        <span class="module-number">05</span>
+        <span class="module-content">
+          <strong>Competency Management</strong>
+          <small>
+            Employee skills, qualifications and competency assessments.
+          </small>
+        </span>
+        <span class="planned-label">Planned</span>
+      </article>
+
+      <!-- 06: Payroll Management -->
+      <article class="hr-module-card planned-card">
+        <span class="module-number">06</span>
+        <span class="module-content">
+          <strong>Payroll Management</strong>
+          <small>
+            Salaries, allowances, deductions and payroll records.
+          </small>
+        </span>
+        <span class="planned-label">Planned</span>
+      </article>
+
+      <!-- 07: Disciplinary Management -->
+      <article class="hr-module-card planned-card">
+        <span class="module-number">07</span>
+        <span class="module-content">
+          <strong>Disciplinary Management</strong>
+          <small>
+            Disciplinary cases, hearings, decisions and employee records.
+          </small>
+        </span>
+        <span class="planned-label">Planned</span>
+      </article>
+
+      <!-- 08: Onboarding and Offboarding -->
+      <article class="hr-module-card planned-card">
+        <span class="module-number">08</span>
+        <span class="module-content">
+          <strong>Onboarding &amp; Offboarding</strong>
+          <small>
+            Employee induction, clearance and exit processes.
+          </small>
+        </span>
+        <span class="planned-label">Planned</span>
+      </article>
+
+      <!-- 09: Asset Management -->
+      <article class="hr-module-card planned-card">
+        <span class="module-number">09</span>
+        <span class="module-content">
+          <strong>Asset Management</strong>
+          <small>
+            Staff equipment allocation, tracking and returns.
+          </small>
+        </span>
+        <span class="planned-label">Planned</span>
+      </article>
+
+      <!-- 10: Recruitment and ATS Tracking -->
+      <article class="hr-module-card planned-card">
+        <span class="module-number">10</span>
+        <span class="module-content">
+          <strong>Recruitment &amp; ATS Tracking</strong>
+          <small>
+            Vacancies, job applications, interviews and recruitment tracking.
+          </small>
+        </span>
+        <span class="planned-label">Planned</span>
+      </article>
+
+    </div>
+  </section>
+
+  <section class="hr-section">
+    <div class="section-heading">
+      <div>
+        <h2>Department Administration</h2>
+        <p>Manage the organizational structure supporting HR operations.</p>
+      </div>
+    </div>
+
+    <div class="hr-actions">
+      <a routerLink="/departments" class="hr-action-card">
+        <span class="action-icon">▤</span>
+        <span>
+          <strong>Department Management</strong>
+          <small>Manage departments and their details.</small>
+        </span>
+        <span class="action-arrow">→</span>
+      </a>
+    </div>
+  </section>
+
+  <footer class="page-footer">
+    <span>GAAMS · Human Resources Management</span>
+    <span>Government Airport Aviation Management System</span>
+  </footer>
+
+</div>

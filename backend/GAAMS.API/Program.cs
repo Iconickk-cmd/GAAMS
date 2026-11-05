@@ -1,27 +1,44 @@
+
 using GAAMS.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-
+// Register controllers.
 builder.Services.AddControllers();
 
+// Register PostgreSQL database.
 builder.Services.AddDbContext<GAAMSDbContext>(options =>
     options.UseNpgsql(
         builder.Configuration.GetConnectionString("GAAMSDatabase")
     ));
 
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-builder.Services.AddOpenApi();
+// Register Swagger.
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+
+// Allow Angular frontend to call the API.
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("GAAMSFrontend", policy =>
+    {
+        policy
+            .WithOrigins("http://localhost:4200")
+            .AllowAnyHeader()
+            .AllowAnyMethod();
+    });
+});
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
+// Configure Swagger.
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi();
+    app.UseSwagger();
+    app.UseSwaggerUI();
 }
+
+app.UseCors("GAAMSFrontend");
 
 app.UseHttpsRedirection();
 
@@ -30,4 +47,5 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+
 public partial class Program { }

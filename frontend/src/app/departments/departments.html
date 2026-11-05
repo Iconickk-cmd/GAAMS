@@ -1,0 +1,266 @@
+
+<div class="departments-page">
+  <header class="page-header">
+    <div>
+      <h1>Department Management</h1>
+      <p>Manage airport departments, department details and status.</p>
+    </div>
+
+    <button class="btn btn-primary" type="button" (click)="openAddForm()">
+      + Add Department
+    </button>
+  </header>
+
+  @if (successMessage()) {
+  <div class="alert alert-success" role="status">
+    {{ successMessage() }}
+  </div>
+  }
+
+  @if (error()) {
+  <div class="alert alert-error" role="alert">
+    {{ error() }}
+  </div>
+  }
+
+  <section class="summary-card">
+    <div>
+      <span class="summary-label">TOTAL DEPARTMENTS</span>
+      <h2>{{ departments().length }}</h2>
+    </div>
+    <div>
+      <span class="summary-label">ACTIVE DEPARTMENTS</span>
+      <h2>{{ departments().filter(d => d.isActive).length }}</h2>
+    </div>
+    <div>
+      <span class="summary-label">INACTIVE DEPARTMENTS</span>
+      <h2>{{ departments().filter(d => !d.isActive).length }}</h2>
+    </div>
+  </section>
+
+  <section class="filters">
+    <div class="search-field">
+      <label for="departmentSearch">Search departments</label>
+      <input id="departmentSearch"
+             type="search"
+             placeholder="Search by name, code or description..."
+             [ngModel]="searchTerm()"
+             (ngModelChange)="searchTerm.set($event)" />
+    </div>
+
+    <div class="status-field">
+      <label for="departmentStatus">Status</label>
+      <select id="departmentStatus"
+              [ngModel]="selectedStatus()"
+              (ngModelChange)="selectedStatus.set($event)">
+        <option value="all">All statuses</option>
+        <option value="active">Active</option>
+        <option value="inactive">Inactive</option>
+      </select>
+    </div>
+  </section>
+
+  <section class="table-card">
+    <div class="table-heading">
+      <h2>Departments</h2>
+      <span>{{ filteredDepartments().length }} records</span>
+    </div>
+
+    @if (loading()) {
+    <div class="empty-state">Loading departments...</div>
+    } @else if (filteredDepartments().length === 0) {
+    <div class="empty-state">
+      <h3>No departments found</h3>
+      <p>Try changing your search or add a new department.</p>
+    </div>
+    } @else {
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>Department</th>
+            <th>Code</th>
+            <th>Description</th>
+            <th>Status</th>
+            <th>Created</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          @for (department of filteredDepartments(); track department.id) {
+          <tr>
+            <td>
+              <strong>{{ department.name }}</strong>
+            </td>
+            <td>
+              <span class="department-code">{{ department.code }}</span>
+            </td>
+            <td>{{ department.description || '—' }}</td>
+            <td>
+              <span class="status-badge"
+                    [class.status-active]="department.isActive"
+                    [class.status-inactive]="!department.isActive">
+                {{ department.isActive ? 'Active' : 'Inactive' }}
+              </span>
+            </td>
+            <td>{{ department.createdAt | date:'dd MMM yyyy' }}</td>
+            <td>
+              <div class="action-buttons">
+                <button type="button"
+                        class="btn btn-view"
+                        (click)="viewDepartment(department)">
+                  View
+                </button>
+                <button type="button"
+                        class="btn btn-edit"
+                        (click)="openEditForm(department)">
+                  Edit
+                </button>
+                <button type="button"
+                        class="btn btn-status"
+                        (click)="toggleStatus(department)">
+                  {{ department.isActive ? 'Deactivate' : 'Activate' }}
+                </button>
+                <button type="button"
+                        class="btn btn-delete"
+                        (click)="deleteDepartment(department)">
+                  Delete
+                </button>
+              </div>
+            </td>
+          </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+    }
+  </section>
+</div>
+
+@if (showForm()) {
+<div class="modal-backdrop">
+  <section class="modal-card" role="dialog" aria-modal="true"
+           aria-labelledby="departmentFormTitle">
+    <header class="modal-header">
+      <div>
+        <h2 id="departmentFormTitle">
+          {{ isEditing() ? 'Edit Department' : 'Add Department' }}
+        </h2>
+        <p>Enter the department details below.</p>
+      </div>
+      <button type="button" class="close-button" (click)="closeForm()"
+              aria-label="Close form">
+        ×
+      </button>
+    </header>
+
+    <form #departmentForm="ngForm" (ngSubmit)="saveDepartment()">
+      <div class="form-group">
+        <label for="departmentName">Department Name *</label>
+        <input id="departmentName"
+               name="name"
+               type="text"
+               [(ngModel)]="newDepartment.name"
+               required
+               maxlength="150"
+               placeholder="e.g. Human Resources" />
+      </div>
+
+      <div class="form-group">
+        <label for="departmentCode">Department Code *</label>
+        <input id="departmentCode"
+               name="code"
+               type="text"
+               [(ngModel)]="newDepartment.code"
+               required
+               maxlength="20"
+               placeholder="e.g. HR" />
+      </div>
+
+      <div class="form-group">
+        <label for="departmentDescription">Description</label>
+        <textarea id="departmentDescription"
+                  name="description"
+                  [(ngModel)]="newDepartment.description"
+                  rows="4"
+                  maxlength="500"
+                  placeholder="Describe the department's responsibilities"></textarea>
+      </div>
+
+      @if (error()) {
+      <div class="alert alert-error" role="alert">{{ error() }}</div>
+      }
+
+      <footer class="modal-actions">
+        <button type="button" class="btn btn-secondary" (click)="closeForm()">
+          Cancel
+        </button>
+        <button type="submit"
+                class="btn btn-primary"
+                [disabled]="departmentForm.invalid || saving()">
+          {{
+              saving()
+                ? 'Saving...'
+                : isEditing()
+                  ? 'Save Changes'
+                  : 'Create Department'
+          }}
+        </button>
+      </footer>
+    </form>
+  </section>
+</div>
+}
+
+@if (viewingDepartment(); as department) {
+<div class="modal-backdrop">
+  <section class="modal-card" role="dialog" aria-modal="true"
+           aria-labelledby="departmentViewTitle">
+    <header class="modal-header">
+      <div>
+        <h2 id="departmentViewTitle">Department Details</h2>
+        <p>Full information about this department.</p>
+      </div>
+      <button type="button" class="close-button" (click)="closeView()"
+              aria-label="Close details">
+        ×
+      </button>
+    </header>
+
+    <dl class="details-list">
+      <div>
+        <dt>Department Name</dt>
+        <dd>{{ department.name }}</dd>
+      </div>
+      <div>
+        <dt>Department Code</dt>
+        <dd>{{ department.code }}</dd>
+      </div>
+      <div>
+        <dt>Description</dt>
+        <dd>{{ department.description || 'Not provided' }}</dd>
+      </div>
+      <div>
+        <dt>Status</dt>
+        <dd>{{ department.isActive ? 'Active' : 'Inactive' }}</dd>
+      </div>
+      <div>
+        <dt>Created</dt>
+        <dd>{{ department.createdAt | date:'dd MMM yyyy, HH:mm' }}</dd>
+      </div>
+    </dl>
+
+    <footer class="modal-actions">
+      <button type="button" class="btn btn-secondary" (click)="closeView()">
+        Close
+      </button>
+      <button type="button"
+              class="btn btn-primary"
+              (click)="closeView(); openEditForm(department)">
+        Edit Department
+      </button>
+    </footer>
+  </section>
+</div>
+}

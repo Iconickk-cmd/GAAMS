@@ -1,0 +1,270 @@
+
+<div class="positions-page">
+
+  <header class="page-header">
+    <div>
+      <h1>Employee & Position Register</h1>
+      <p>Manage approved positions, organizational structure and staffing.</p>
+    </div>
+
+    <div class="header-actions">
+      <button class="btn btn-secondary" (click)="loadPositions()">
+        Refresh
+      </button>
+      <button class="btn btn-primary" (click)="openCreateForm()">
+        + Add Position
+      </button>
+    </div>
+  </header>
+
+  <div class="alert alert-success" *ngIf="successMessage()">
+    {{ successMessage() }}
+  </div>
+
+  <div class="alert alert-error" *ngIf="errorMessage()">
+    {{ errorMessage() }}
+  </div>
+
+  <section class="stats-grid">
+    <div class="stat-card">
+      <span>Total Positions</span>
+      <strong>{{ totalPositions }}</strong>
+    </div>
+
+    <div class="stat-card">
+      <span>Active Positions</span>
+      <strong>{{ activePositions }}</strong>
+    </div>
+
+    <div class="stat-card">
+      <span>Approved Posts</span>
+      <strong>{{ totalApprovedPosts }}</strong>
+    </div>
+
+    <div class="stat-card">
+      <span>Vacant Posts</span>
+      <strong>{{ vacantPosts }}</strong>
+    </div>
+  </section>
+
+  <section class="content-card">
+
+    <div class="table-header">
+      <div>
+        <h2>Position Directory</h2>
+        <p>View and manage approved organizational positions.</p>
+      </div>
+
+      <input type="search"
+             class="search-input"
+             placeholder="Search title, code or department..."
+             [(ngModel)]="searchTerm" />
+    </div>
+
+    <div class="loading-state" *ngIf="loading()">
+      Loading positions...
+    </div>
+
+    <div class="empty-state"
+         *ngIf="!loading() && filteredPositions.length === 0">
+      <h3>No positions found</h3>
+      <p>Add your first organizational position to get started.</p>
+    </div>
+
+    <div class="table-wrapper"
+         *ngIf="!loading() && filteredPositions.length > 0">
+
+      <table>
+        <thead>
+          <tr>
+            <th>Position Code</th>
+            <th>Position Title</th>
+            <th>Department</th>
+            <th>Employment Type</th>
+            <th>Grade</th>
+            <th>Approved Posts</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          <tr *ngFor="let position of filteredPositions">
+
+            <td>
+              <strong>{{ position.positionCode }}</strong>
+            </td>
+
+            <td>{{ position.title }}</td>
+
+            <td>
+              {{ position.department?.name || 'Department #' + position.departmentId }}
+            </td>
+
+            <td>{{ position.employmentType || 'Not specified' }}</td>
+
+            <td>{{ position.employmentGrade || 'Not specified' }}</td>
+
+            <td>{{ position.approvedHeadcount }}</td>
+
+            <td>
+              <span class="status-badge"
+                    [class.active]="position.isActive"
+                    [class.inactive]="!position.isActive">
+                {{ position.isActive ? 'Active' : 'Inactive' }}
+              </span>
+            </td>
+
+            <td>
+              <div class="action-buttons">
+                <button class="btn btn-small btn-edit"
+                        (click)="openEditForm(position)">
+                  Edit
+                </button>
+
+                <button *ngIf="position.isActive"
+                        class="btn btn-small btn-deactivate"
+                        (click)="deactivatePosition(position)">
+                  Deactivate
+                </button>
+              </div>
+            </td>
+
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+  </section>
+
+  <!-- Position Create / Edit Form -->
+  <div class="modal-backdrop" *ngIf="showForm" (click)="closeForm()">
+
+    <section class="position-modal"
+             (click)="$event.stopPropagation()">
+
+      <div class="modal-header">
+        <div>
+          <h2>{{ editingId ? 'Edit Position' : 'Register New Position' }}</h2>
+          <p>Enter the organizational position details below.</p>
+        </div>
+
+        <button class="close-button"
+                type="button"
+                (click)="closeForm()">
+          &times;
+        </button>
+      </div>
+
+      <form (ngSubmit)="savePosition()" #positionForm="ngForm">
+
+        <div class="form-grid">
+
+          <div class="form-group">
+            <label>Position Code *</label>
+            <input type="text"
+                   name="positionCode"
+                   [(ngModel)]="form.positionCode"
+                   placeholder="e.g. HRA-POS-002"
+                   required
+                   maxlength="50" />
+          </div>
+
+          <div class="form-group">
+            <label>Position Title *</label>
+            <input type="text"
+                   name="title"
+                   [(ngModel)]="form.title"
+                   placeholder="Enter position title"
+                   required
+                   maxlength="150" />
+          </div>
+
+          <div class="form-group">
+            <label>Department *</label>
+            <select name="departmentId"
+                    [(ngModel)]="form.departmentId"
+                    required>
+              <option [ngValue]="null">Select department</option>
+              <option *ngFor="let department of departments()"
+                      [ngValue]="department.id">
+                {{ department.name }} ({{ department.code }})
+              </option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Employment Type</label>
+            <select name="employmentType"
+                    [(ngModel)]="form.employmentType">
+              <option value="Permanent">Permanent</option>
+              <option value="Contract">Contract</option>
+              <option value="Temporary">Temporary</option>
+              <option value="Internship">Internship</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Employment Grade</label>
+            <input type="text"
+                   name="employmentGrade"
+                   [(ngModel)]="form.employmentGrade"
+                   placeholder="e.g. Management"
+                   maxlength="50" />
+          </div>
+
+          <div class="form-group">
+            <label>Approved Headcount *</label>
+            <input type="number"
+                   name="approvedHeadcount"
+                   [(ngModel)]="form.approvedHeadcount"
+                   min="1"
+                   required />
+          </div>
+
+          <div class="form-group full-width">
+            <label>Position Description</label>
+            <textarea name="description"
+                      [(ngModel)]="form.description"
+                      rows="3"
+                      maxlength="1000"
+                      placeholder="Describe the responsibilities of this position">
+            </textarea>
+          </div>
+
+          <div class="form-group full-width checkbox-group"
+               *ngIf="editingId">
+            <label>
+              <input type="checkbox"
+                     name="isActive"
+                     [(ngModel)]="form.isActive" />
+              Position is active
+            </label>
+          </div>
+
+        </div>
+
+        <div class="form-error" *ngIf="errorMessage()">
+          {{ errorMessage() }}
+        </div>
+
+        <div class="modal-actions">
+          <button type="button"
+                  class="btn btn-secondary"
+                  (click)="closeForm()">
+            Cancel
+          </button>
+
+          <button type="submit"
+                  class="btn btn-primary"
+                  [disabled]="saving() || positionForm.invalid">
+            {{ saving() ? 'Saving...' : (editingId ? 'Update Position' : 'Save Position') }}
+          </button>
+        </div>
+
+      </form>
+
+    </section>
+  </div>
+
+</div>

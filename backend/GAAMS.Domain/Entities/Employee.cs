@@ -1,4 +1,5 @@
-﻿namespace GAAMS.Domain.Entities;
+﻿
+namespace GAAMS.Domain.Entities;
 
 public class Employee
 {
@@ -26,7 +27,16 @@ public class Employee
 
     public bool IsActive { get; set; } = true;
 
+    // Employment termination information
+    public DateTime? TerminationDate { get; set; }
+
+    public string? TerminationReason { get; set; }
+
+    public string? TerminationType { get; set; }
+
+    // Record creation information
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
+    // Department relationship
     public Department? Department { get; set; }
 }

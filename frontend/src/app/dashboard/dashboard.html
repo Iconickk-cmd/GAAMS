@@ -1,0 +1,287 @@
+
+<div class="gaams-shell">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">G</div>
+      <div>
+        <h2>GAAMS</h2>
+        <span>AVIATION MANAGEMENT</span>
+      </div>
+    </div>
+
+    <div class="nav-label">WORKSPACE</div>
+
+    <nav class="navigation" aria-label="Main navigation">
+      <a class="nav-item active" routerLink="/">
+        <span class="nav-icon">▦</span> Dashboard
+      </a>
+      <a class="nav-item" routerLink="/departments">
+        <span class="nav-icon">▤</span> Departments
+      </a>
+      <a class="nav-item" routerLink="/employees">
+        <span class="nav-icon">♙</span> Employees
+      </a>
+      <a class="nav-item" routerLink="/hr">
+        <span class="nav-icon">♧</span> Human Resources
+      </a>
+      <a class="nav-item" routerLink="/leave-management">
+        <span class="nav-icon">▣</span> Leave Management
+      </a>
+      <a class="nav-item" href="#finance">
+        <span class="nav-icon">▥</span> Finance
+      </a>
+      <a class="nav-item" href="#portal">
+        <span class="nav-icon">◎</span> Portal
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="status-dot"></div>
+      <div>
+        <strong>GAAMS System</strong>
+        <span>Local development</span>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main-area" id="dashboard">
+    <header class="topbar">
+      <div>
+        <div class="breadcrumb">Workspace / <strong>Dashboard</strong></div>
+        <h1>Airport Operations Dashboard</h1>
+        <p class="subtitle">
+          Welcome to the Government Airport Aviation Management System.
+        </p>
+      </div>
+
+      <div class="user-profile">
+        <div class="user-avatar">GA</div>
+        <div class="user-details">
+          <strong>System Administrator</strong>
+          <span>Administrator</span>
+        </div>
+      </div>
+    </header>
+
+    <section class="welcome-banner">
+      <div>
+        <span class="eyebrow">CENTRAL OPERATIONS</span>
+        <h2>Manage airport operations with confidence.</h2>
+        <p>
+          Access workforce records, departments and administrative services
+          from one workspace.
+        </p>
+      </div>
+      <div class="banner-symbol" aria-hidden="true">✈</div>
+    </section>
+
+    <section class="section-heading">
+      <div>
+        <h2>System Overview</h2>
+        <p>Your administrative workspace at a glance.</p>
+      </div>
+      <span class="environment-tag">
+        <span></span> DEVELOPMENT
+      </span>
+    </section>
+
+    <section class="stats-grid" aria-label="System overview">
+      <article class="stat-card">
+        <div class="stat-top">
+          <span class="stat-icon blue">▤</span>
+          <span class="stat-label">ORGANIZATION</span>
+        </div>
+        <div class="stat-value">
+          {{ departmentCount() ?? (departmentError() ? '!' : '…') }}
+        </div>
+        <h3>Total Departments</h3>
+        <p>Registered departments</p>
+        <a routerLink="/departments">Manage departments →</a>
+        @if (departmentError()) {
+        <p role="alert">Could not load department statistics.</p>
+        }
+      </article>
+
+      <article class="stat-card">
+        <div class="stat-top">
+          <span class="stat-icon teal">✓</span>
+          <span class="stat-label">ACTIVE STATUS</span>
+        </div>
+        <div class="stat-value">
+          {{ activeDepartmentCount() ?? (departmentError() ? '!' : '…') }}
+        </div>
+        <h3>Active Departments</h3>
+        <p>Departments currently active</p>
+      </article>
+
+      <article class="stat-card">
+        <div class="stat-top">
+          <span class="stat-icon amber">◷</span>
+          <span class="stat-label">INACTIVE STATUS</span>
+        </div>
+        <div class="stat-value">
+          {{ inactiveDepartmentCount() ?? (departmentError() ? '!' : '…') }}
+        </div>
+        <h3>Inactive Departments</h3>
+        <p>Departments currently inactive</p>
+      </article>
+
+      <article class="stat-card">
+        <div class="stat-top">
+          <span class="stat-icon violet">♙</span>
+          <span class="stat-label">WORKFORCE</span>
+        </div>
+        <div class="stat-value">
+          {{ employeeCount() ?? (employeeError() ? '!' : '…') }}
+        </div>
+        <h3>Employees</h3>
+        <p>Employee records</p>
+        <a routerLink="/employees">Manage employees →</a>
+        @if (employeeError()) {
+        <p role="alert">Could not load employee statistics.</p>
+        }
+      </article>
+    </section>
+
+    <section class="refresh-panel">
+      <div>
+        <h2>Dashboard Statistics</h2>
+        <p>
+          Refresh to retrieve the latest department and employee totals
+          from the backend.
+        </p>
+
+        @if (lastUpdated()) {
+        <p class="card-note">
+          Last updated: {{ lastUpdated() | date:'medium' }}
+        </p>
+        }
+      </div>
+
+      <button type="button"
+              class="refresh-button"
+              [disabled]="refreshing()"
+              (click)="refreshStatistics()">
+        {{ refreshing() ? 'Refreshing...' : '↻ Refresh Statistics' }}
+      </button>
+    </section>
+
+    <section class="modules-section">
+      <div class="section-heading">
+        <div>
+          <h2>Employees by Department</h2>
+          <p>See how employees are distributed across your departments.</p>
+        </div>
+      </div>
+
+      @if (employeeError() || departmentError()) {
+      <div class="stat-card" role="alert">
+        Unable to load employee-by-department statistics.
+        Use Refresh Statistics to try again.
+      </div>
+      } @else if (departmentEmployeeCounts().length === 0) {
+      <div class="stat-card">
+        @if (refreshing()) {
+        Loading department employee statistics...
+        } @else {
+        No department statistics available.
+        }
+      </div>
+      } @else {
+      <div class="modules-grid">
+        @for (item of departmentEmployeeCounts(); track item.departmentId) {
+        <article class="module-card">
+          <div class="module-icon violet">♙</div>
+          <div>
+            <h3>{{ item.departmentName }}</h3>
+            <p>Department code: {{ item.departmentCode }}</p>
+            <p>
+              <strong>{{ item.employeeCount }}</strong>
+              {{ item.employeeCount === 1 ? 'employee' : 'employees' }}
+            </p>
+          </div>
+        </article>
+        }
+      </div>
+      }
+    </section>
+
+    <section class="modules-section">
+      <div class="section-heading">
+        <div>
+          <h2>Management Modules</h2>
+          <p>Choose a module to access its workspace.</p>
+        </div>
+      </div>
+
+      <div class="modules-grid">
+        <a class="module-card" routerLink="/departments">
+          <div class="module-icon blue">▤</div>
+          <div>
+            <h3>Departments</h3>
+            <p>Manage organizational departments and their details.</p>
+          </div>
+          <span class="module-arrow">→</span>
+        </a>
+
+        <a class="module-card" routerLink="/employees">
+          <div class="module-icon violet">♙</div>
+          <div>
+            <h3>Employees</h3>
+            <p>View and maintain employee records.</p>
+          </div>
+          <span class="module-arrow">→</span>
+        </a>
+
+        <a class="module-card" routerLink="/hr">
+          <div class="module-icon teal">♧</div>
+          <div>
+            <h3>Human Resources</h3>
+            <p>Access workforce administration tools.</p>
+          </div>
+          <span class="module-arrow">→</span>
+        </a>
+
+        <a class="module-card" routerLink="/leave-management">
+          <div class="module-icon teal">▣</div>
+          <div>
+            <h3>Leave Management</h3>
+            <p>Submit, approve and manage employee leave requests.</p>
+          </div>
+          <span class="module-arrow">→</span>
+        </a>
+
+        <a class="module-card" href="#finance" id="finance">
+          <div class="module-icon amber">▥</div>
+          <div>
+            <h3>Finance</h3>
+            <p>Workspace for financial administration.</p>
+          </div>
+          <span class="module-arrow">→</span>
+        </a>
+
+        <a class="module-card" href="#portal" id="portal">
+          <div class="module-icon blue">◎</div>
+          <div>
+            <h3>Portal</h3>
+            <p>Central access point for system services.</p>
+          </div>
+          <span class="module-arrow">→</span>
+        </a>
+
+        <article class="module-card information-card">
+          <div class="module-icon teal">⌘</div>
+          <div>
+            <h3>System Workspace</h3>
+            <p>A unified interface for airport administration.</p>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <footer class="page-footer">
+      <span>GAAMS · Government Airport Aviation Management System</span>
+      <span>Live department and employee statistics</span>
+    </footer>
+  </main>
+</div>

@@ -1,0 +1,422 @@
+
+<div class="employees-page">
+
+  <div class="page-header">
+    <div>
+      <span class="eyebrow">GAAMS / WORKFORCE</span>
+      <h1>Employee Management</h1>
+      <p>View and manage airport employee records.</p>
+    </div>
+
+    <button class="add-button" type="button" (click)="openForm()">
+      + Add Employee
+    </button>
+  </div>
+
+  @if (successMessage()) {
+  <div class="success-message">{{ successMessage() }}</div>
+  }
+
+  <div class="summary-card">
+    <div>
+      <span class="summary-label">TOTAL EMPLOYEES</span>
+      <h2>{{ totalCount() }}</h2>
+      <p>Matching employee records</p>
+    </div>
+    <div class="summary-icon">♙</div>
+  </div>
+
+  <!-- VIEW EMPLOYEE DETAILS -->
+  @if (viewingEmployee(); as employee) {
+  <div class="details-overlay">
+    <div class="details-card">
+
+      <div class="details-header">
+        <div>
+          <span class="eyebrow">EMPLOYEE RECORD</span>
+          <h2>Employee Details</h2>
+          <p>Read-only employee information</p>
+        </div>
+
+        <button class="close-button" type="button" (click)="closeView()">
+          ✕
+        </button>
+      </div>
+
+      <div class="details-profile">
+        <div class="profile-avatar">
+          {{ employee.firstName.charAt(0) }}{{ employee.lastName.charAt(0) }}
+        </div>
+
+        <div>
+          <h3>{{ employee.firstName }} {{ employee.lastName }}</h3>
+          <p>{{ employee.jobTitle || 'Job title not specified' }}</p>
+          <span class="status-badge" [class.inactive]="!employee.isActive">
+            {{ employee.isActive ? 'Active' : 'Inactive' }}
+          </span>
+        </div>
+      </div>
+
+      <div class="details-grid">
+
+        <div class="detail-item">
+          <span>Employee Number</span>
+          <strong>{{ employee.employeeNumber }}</strong>
+        </div>
+
+        <div class="detail-item">
+          <span>Department</span>
+          <strong>{{ employee.department?.name ?? 'Not assigned' }}</strong>
+        </div>
+
+        <div class="detail-item">
+          <span>First Name</span>
+          <strong>{{ employee.firstName }}</strong>
+        </div>
+
+        <div class="detail-item">
+          <span>Last Name</span>
+          <strong>{{ employee.lastName }}</strong>
+        </div>
+
+        <div class="detail-item">
+          <span>National ID</span>
+          <strong>{{ employee.nationalId || 'Not provided' }}</strong>
+        </div>
+
+        <div class="detail-item">
+          <span>Email Address</span>
+          <strong>{{ employee.email || 'Not provided' }}</strong>
+        </div>
+
+        <div class="detail-item">
+          <span>Phone Number</span>
+          <strong>{{ employee.phoneNumber || 'Not provided' }}</strong>
+        </div>
+
+        <div class="detail-item">
+          <span>Date of Birth</span>
+          <strong>{{ employee.dateOfBirth | date:'dd MMM yyyy' }}</strong>
+        </div>
+
+        <div class="detail-item">
+          <span>Date of Employment</span>
+          <strong>{{ employee.dateOfEmployment | date:'dd MMM yyyy' }}</strong>
+        </div>
+
+        <div class="detail-item">
+          <span>Job Title</span>
+          <strong>{{ employee.jobTitle || 'Not specified' }}</strong>
+        </div>
+
+        <div class="detail-item">
+          <span>Employment Status</span>
+          <strong>{{ employee.isActive ? 'Active' : 'Inactive' }}</strong>
+        </div>
+
+      </div>
+
+      <div class="details-actions">
+        <button class="refresh-button" type="button" (click)="closeView()">
+          Close
+        </button>
+
+        <button class="add-button" type="button" (click)="editEmployee(employee)">
+          Edit Employee
+        </button>
+      </div>
+
+    </div>
+  </div>
+  }
+
+  <!-- ADD / EDIT EMPLOYEE FORM -->
+  @if (showForm()) {
+  <div class="form-card">
+
+    <div class="table-header">
+      <div>
+        <h2>{{ isEditing() ? 'Edit Employee' : 'Register New Employee' }}</h2>
+        <p>
+          {{ isEditing() ? 'Update the employee information below.' : 'Enter the employee information below.' }}
+        </p>
+      </div>
+
+      <button class="refresh-button" type="button" (click)="closeForm()">
+        Close
+      </button>
+    </div>
+
+    @if (saveError()) {
+    <div class="error-message">{{ saveError() }}</div>
+    }
+
+    <form (ngSubmit)="saveEmployee()" #employeeForm="ngForm">
+
+      <div class="form-grid">
+
+        <div class="form-group">
+          <label for="employeeNumber">Employee Number *</label>
+          <input id="employeeNumber" type="text" name="employeeNumber"
+                 [(ngModel)]="newEmployee.employeeNumber" maxlength="50" required>
+        </div>
+
+        <div class="form-group">
+          <label for="firstName">First Name *</label>
+          <input id="firstName" type="text" name="firstName"
+                 [(ngModel)]="newEmployee.firstName" maxlength="100" required>
+        </div>
+
+        <div class="form-group">
+          <label for="lastName">Last Name *</label>
+          <input id="lastName" type="text" name="lastName"
+                 [(ngModel)]="newEmployee.lastName" maxlength="100" required>
+        </div>
+
+        <div class="form-group">
+          <label for="nationalId">National ID</label>
+          <input id="nationalId" type="text" name="nationalId"
+                 [(ngModel)]="newEmployee.nationalId" maxlength="20">
+        </div>
+
+        <div class="form-group">
+          <label for="email">Email Address</label>
+          <input id="email" type="email" name="email"
+                 [(ngModel)]="newEmployee.email" maxlength="254" email>
+        </div>
+
+        <div class="form-group">
+          <label for="phoneNumber">Phone Number</label>
+          <input id="phoneNumber" type="tel" name="phoneNumber"
+                 [(ngModel)]="newEmployee.phoneNumber" maxlength="30">
+        </div>
+
+        <div class="form-group">
+          <label for="dateOfBirth">Date of Birth *</label>
+          <input id="dateOfBirth" type="date" name="dateOfBirth"
+                 [(ngModel)]="newEmployee.dateOfBirth" [max]="today" required>
+        </div>
+
+        <div class="form-group">
+          <label for="dateOfEmployment">Date of Employment *</label>
+          <input id="dateOfEmployment" type="date" name="dateOfEmployment"
+                 [(ngModel)]="newEmployee.dateOfEmployment" [max]="today" required>
+        </div>
+
+        <div class="form-group">
+          <label for="jobTitle">Job Title</label>
+          <input id="jobTitle" type="text" name="jobTitle"
+                 [(ngModel)]="newEmployee.jobTitle" maxlength="100">
+        </div>
+
+        <div class="form-group">
+          <label for="departmentId">Department *</label>
+          <select id="departmentId" name="departmentId"
+                  [(ngModel)]="newEmployee.departmentId" required>
+            <option [ngValue]="0" disabled>Select department</option>
+            @for (department of departments(); track department.id) {
+            <option [ngValue]="department.id">{{ department.name }}</option>
+            }
+          </select>
+        </div>
+
+        @if (isEditing()) {
+        <div class="form-group">
+          <label for="isActive">Employee Status *</label>
+          <select id="isActive" name="isActive"
+                  [(ngModel)]="newEmployee.isActive">
+            <option [ngValue]="true">Active</option>
+            <option [ngValue]="false">Inactive</option>
+          </select>
+        </div>
+        }
+
+      </div>
+
+      <p class="form-note">* Required fields</p>
+
+      <div class="form-actions">
+        <button class="refresh-button" type="button" (click)="closeForm()">
+          Cancel
+        </button>
+
+        <button class="add-button" type="submit"
+                [disabled]="saving() || !employeeForm.valid || newEmployee.departmentId <= 0">
+          {{ saving() ? 'Saving...' : isEditing() ? 'Update Employee' : 'Save Employee' }}
+        </button>
+      </div>
+
+    </form>
+  </div>
+  }
+
+  <!-- EMPLOYEE DIRECTORY -->
+  <div class="table-card">
+
+    <div class="table-header">
+      <div>
+        <h2>All Employees</h2>
+        <p>Employee directory and records</p>
+      </div>
+
+      <button class="refresh-button" type="button" (click)="loadEmployees()">
+        ↻ Refresh
+      </button>
+    </div>
+
+    <div class="employee-search-bar">
+      <input type="search"
+             name="employeeSearch"
+             placeholder="Search by name, employee number, National ID or email..."
+             [ngModel]="searchTerm()"
+             (ngModelChange)="searchTerm.set($event)"
+             (keyup.enter)="searchEmployees()">
+
+      <button class="search-button" type="button" (click)="searchEmployees()">
+        Search
+      </button>
+
+      <button class="reset-button" type="button" (click)="clearFilters()">
+        Reset
+      </button>
+    </div>
+
+    <div class="advanced-filters">
+
+      <div class="filter-group">
+        <label for="departmentFilter">Department</label>
+        <select id="departmentFilter"
+                [ngModel]="selectedDepartment()"
+                (ngModelChange)="selectedDepartment.set($event === null ? null : +$event); filterEmployees()">
+          <option [ngValue]="null">All Departments</option>
+          @for (department of departments(); track department.id) {
+          <option [ngValue]="department.id">{{ department.name }}</option>
+          }
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label for="statusFilter">Status</label>
+        <select id="statusFilter"
+                [ngModel]="selectedStatus()"
+                (ngModelChange)="selectedStatus.set($event); filterEmployees()">
+          <option value="">All Statuses</option>
+          <option value="true">Active</option>
+          <option value="false">Inactive</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label for="sortFilter">Sort by</label>
+        <select id="sortFilter"
+                [ngModel]="sortBy()"
+                (ngModelChange)="changeSort($event)">
+          <option value="lastName">Last Name</option>
+          <option value="firstName">First Name</option>
+          <option value="employeeNumber">Employee Number</option>
+          <option value="dateOfEmployment">Date of Employment</option>
+        </select>
+      </div>
+
+    </div>
+
+    @if (loading()) {
+    <div class="message">Loading employee records...</div>
+    }
+
+    @if (error()) {
+    <div class="error-message">{{ error() }}</div>
+    }
+
+    @if (!loading() && !error()) {
+    <div class="table-wrapper">
+      <table class="employee-table">
+
+        <thead>
+          <tr>
+            <th>EMPLOYEE</th>
+            <th>EMPLOYEE NAME</th>
+            <th>DEPARTMENT</th>
+            <th>JOB TITLE</th>
+            <th>STATUS</th>
+            <th>ACTIONS</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          @for (employee of employees(); track employee.id) {
+          <tr>
+            <td><strong>{{ employee.employeeNumber }}</strong></td>
+
+            <td class="employee-name">
+              {{ employee.firstName }} {{ employee.lastName }}
+            </td>
+
+            <td>{{ employee.department?.name ?? 'Not assigned' }}</td>
+
+            <td>{{ employee.jobTitle || '—' }}</td>
+
+            <td>
+              <span class="status-badge" [class.inactive]="!employee.isActive">
+                {{ employee.isActive ? 'Active' : 'Inactive' }}
+              </span>
+            </td>
+
+            <td>
+              <div class="employee-actions">
+
+                <button class="view-button" type="button"
+                        (click)="viewEmployee(employee)">
+                  View
+                </button>
+
+                <button class="refresh-button" type="button"
+                        (click)="editEmployee(employee)">
+                  Edit
+                </button>
+
+                <button class="delete-button" type="button"
+                        (click)="deleteEmployee(employee)">
+                  Delete
+                </button>
+
+              </div>
+            </td>
+          </tr>
+          } @empty {
+          <tr>
+            <td colspan="6" class="empty-message">
+              No employee records found.
+            </td>
+          </tr>
+          }
+        </tbody>
+
+      </table>
+    </div>
+
+    <div class="pagination">
+      <span>
+        Showing {{ employees().length }} of {{ totalCount() }} matching employees
+      </span>
+
+      <div class="pagination-controls">
+
+        <button class="refresh-button" type="button"
+                (click)="previousPage()" [disabled]="page() <= 1">
+          Previous
+        </button>
+
+        <span>Page {{ page() }} of {{ totalPages() }}</span>
+
+        <button class="refresh-button" type="button"
+                (click)="nextPage()" [disabled]="page() >= totalPages()">
+          Next
+        </button>
+
+      </div>
+    </div>
+    }
+
+  </div>
+</div>

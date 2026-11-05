@@ -1,0 +1,370 @@
+
+<div class="assignments-page">
+
+  <div class="page-header">
+    <div>
+      <h1>Employee Position Assignments</h1>
+      <p>Manage employee appointments, transfers and position history.</p>
+    </div>
+
+    <div class="header-actions">
+      <button class="btn btn-secondary" (click)="refreshData()">
+        Refresh
+      </button>
+
+      <button class="btn btn-secondary" (click)="openTransferForm()">
+        Transfer Employee
+      </button>
+
+      <button class="btn btn-primary" (click)="openForm()">
+        + Assign Employee
+      </button>
+    </div>
+  </div>
+
+  <div class="alert alert-success" *ngIf="successMessage()">
+    {{ successMessage() }}
+  </div>
+
+  <div class="alert alert-error" *ngIf="errorMessage()">
+    {{ errorMessage() }}
+  </div>
+
+  <div class="stats-grid">
+    <div class="stat-card">
+      <span>Current Assignments</span>
+      <strong>{{ totalCurrentAssignments }}</strong>
+    </div>
+
+    <div class="stat-card">
+      <span>Previous Assignments</span>
+      <strong>{{ totalPreviousAssignments }}</strong>
+    </div>
+
+    <div class="stat-card">
+      <span>Available Employees</span>
+      <strong>{{ availableEmployees.length }}</strong>
+    </div>
+
+    <div class="stat-card">
+      <span>Available Positions</span>
+      <strong>{{ availablePositions.length }}</strong>
+    </div>
+  </div>
+
+  <section class="content-card">
+    <div class="section-header">
+      <div>
+        <h2>Current Assignments</h2>
+        <p>Employees currently occupying approved positions.</p>
+      </div>
+
+      <input type="text"
+             class="search-input"
+             placeholder="Search employee or position..."
+             [(ngModel)]="searchTerm" />
+    </div>
+
+    <div class="loading-message" *ngIf="loading()">
+      Loading assignments...
+    </div>
+
+    <div class="table-wrapper" *ngIf="!loading()">
+      <table>
+        <thead>
+          <tr>
+            <th>Employee Number</th>
+            <th>Employee Name</th>
+            <th>Position</th>
+            <th>Department</th>
+            <th>Start Date</th>
+            <th>Change Reason</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          <tr *ngFor="let assignment of filteredAssignments">
+            <td>{{ assignment.employee?.employeeNumber || '-' }}</td>
+
+            <td>
+              {{ assignment.employee?.firstName }}
+              {{ assignment.employee?.lastName }}
+            </td>
+
+            <td>{{ assignment.position?.title || '-' }}</td>
+
+            <td>
+              {{ assignment.position?.department?.name || '-' }}
+            </td>
+
+            <td>{{ assignment.startDate | date:'mediumDate' }}</td>
+
+            <td>{{ assignment.changeReason || '-' }}</td>
+
+            <td>
+              <button class="btn btn-danger btn-small"
+                      (click)="endAssignment(assignment)">
+                End Assignment
+              </button>
+            </td>
+          </tr>
+
+          <tr *ngIf="filteredAssignments.length === 0">
+            <td colspan="7" class="empty-state">
+              No current assignments found.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="content-card history-card">
+    <div class="section-header">
+      <div>
+        <h2>Previous Assignments</h2>
+        <p>Historical employee appointments and transfers.</p>
+      </div>
+    </div>
+
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>Employee</th>
+            <th>Position</th>
+            <th>Start Date</th>
+            <th>End Date</th>
+            <th>Change Reason</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          <tr *ngFor="let assignment of previousAssignments">
+            <td>
+              {{ assignment.employee?.firstName }}
+              {{ assignment.employee?.lastName }}
+            </td>
+
+            <td>{{ assignment.position?.title || '-' }}</td>
+
+            <td>{{ assignment.startDate | date:'mediumDate' }}</td>
+
+            <td>
+              {{ assignment.endDate ? (assignment.endDate | date:'mediumDate') : '-' }}
+            </td>
+
+            <td>{{ assignment.changeReason || '-' }}</td>
+
+            <td>
+              <span class="status-badge">Ended</span>
+            </td>
+          </tr>
+
+          <tr *ngIf="previousAssignments.length === 0">
+            <td colspan="6" class="empty-state">
+              No previous assignments recorded.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ASSIGN EMPLOYEE MODAL -->
+  <div class="modal-backdrop" *ngIf="showForm">
+    <div class="assignment-modal">
+
+      <div class="modal-header">
+        <div>
+          <h2>Assign Employee to Position</h2>
+          <p>Record a new employee appointment.</p>
+        </div>
+
+        <button class="close-button" (click)="closeForm()">
+          &times;
+        </button>
+      </div>
+
+      <div class="alert alert-error" *ngIf="errorMessage()">
+        {{ errorMessage() }}
+      </div>
+
+      <form (ngSubmit)="assignEmployee()">
+
+        <div class="form-group">
+          <label for="employee">Employee</label>
+
+          <select id="employee"
+                  name="employeeId"
+                  [(ngModel)]="form.employeeId"
+                  required>
+            <option [ngValue]="null">Select employee</option>
+
+            <option *ngFor="let employee of availableEmployees"
+                    [ngValue]="employee.id">
+              {{ employee.employeeNumber }} -
+              {{ employee.firstName }} {{ employee.lastName }}
+            </option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="position">Approved Position</label>
+
+          <select id="position"
+                  name="positionId"
+                  [(ngModel)]="form.positionId"
+                  required>
+            <option [ngValue]="null">Select position</option>
+
+            <option *ngFor="let position of availablePositions"
+                    [ngValue]="position.id">
+              {{ position.positionCode }} -
+              {{ position.title }}
+              ({{ position.currentOccupancy }}/{{ position.approvedHeadcount }})
+            </option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="startDate">Assignment Start Date</label>
+
+          <input type="date"
+                 id="startDate"
+                 name="startDate"
+                 [(ngModel)]="form.startDate"
+                 required />
+        </div>
+
+        <div class="form-group">
+          <label for="changeReason">Reason for Assignment</label>
+
+          <textarea id="changeReason"
+                    name="changeReason"
+                    rows="3"
+                    [(ngModel)]="form.changeReason"
+                    placeholder="Enter appointment, promotion or transfer reason"></textarea>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button"
+                  class="btn btn-secondary"
+                  (click)="closeForm()">
+            Cancel
+          </button>
+
+          <button type="submit"
+                  class="btn btn-primary"
+                  [disabled]="saving()">
+            {{ saving() ? 'Saving...' : 'Save Assignment' }}
+          </button>
+        </div>
+
+      </form>
+    </div>
+  </div>
+
+  <!-- TRANSFER EMPLOYEE MODAL -->
+  <div class="modal-backdrop" *ngIf="showTransferForm">
+    <div class="assignment-modal">
+
+      <div class="modal-header">
+        <div>
+          <h2>Transfer Employee</h2>
+          <p>Move an employee from their current position to another approved position.</p>
+        </div>
+
+        <button class="close-button" (click)="closeTransferForm()">
+          &times;
+        </button>
+      </div>
+
+      <div class="alert alert-error" *ngIf="errorMessage()">
+        {{ errorMessage() }}
+      </div>
+
+      <div class="alert alert-error" *ngIf="availablePositions.length === 0">
+        There are currently no vacant approved positions available for transfer.
+        Create a new position or increase an approved headcount before proceeding.
+      </div>
+
+      <form (ngSubmit)="transferEmployee()">
+
+        <div class="form-group">
+          <label for="transferEmployee">Employee to Transfer</label>
+
+          <select id="transferEmployee"
+                  name="transferEmployeeId"
+                  [(ngModel)]="transferForm.employeeId"
+                  required>
+            <option [ngValue]="null">Select employee</option>
+
+            <option *ngFor="let employee of assignedEmployees"
+                    [ngValue]="employee.id">
+              {{ employee.employeeNumber }} -
+              {{ employee.firstName }} {{ employee.lastName }}
+              ({{ employee.jobTitle }})
+            </option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="newPosition">Destination Position</label>
+
+          <select id="newPosition"
+                  name="newPositionId"
+                  [(ngModel)]="transferForm.newPositionId"
+                  required>
+            <option [ngValue]="null">Select destination position</option>
+
+            <option *ngFor="let position of availablePositions"
+                    [ngValue]="position.id">
+              {{ position.positionCode }} -
+              {{ position.title }}
+              ({{ position.currentOccupancy }}/{{ position.approvedHeadcount }})
+            </option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="effectiveDate">Transfer Effective Date</label>
+
+          <input type="date"
+                 id="effectiveDate"
+                 name="effectiveDate"
+                 [(ngModel)]="transferForm.effectiveDate"
+                 required />
+        </div>
+
+        <div class="form-group">
+          <label for="transferReason">Reason for Transfer</label>
+
+          <textarea id="transferReason"
+                    name="transferReason"
+                    rows="3"
+                    [(ngModel)]="transferForm.changeReason"
+                    placeholder="Enter reason for transfer"></textarea>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button"
+                  class="btn btn-secondary"
+                  (click)="closeTransferForm()">
+            Cancel
+          </button>
+
+          <button type="submit"
+                  class="btn btn-primary"
+                  [disabled]="saving() || availablePositions.length === 0">
+            {{ saving() ? 'Processing...' : 'Confirm Transfer' }}
+          </button>
+        </div>
+
+      </form>
+    </div>
+  </div>
+
+</div>
