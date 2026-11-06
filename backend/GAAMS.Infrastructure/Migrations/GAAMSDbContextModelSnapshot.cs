@@ -289,6 +289,166 @@ namespace GAAMS.Infrastructure.Migrations
                     b.ToTable("EmployeeSeparationClearances");
                 });
 
+            modelBuilder.Entity("GAAMS.Domain.Entities.EmployeeSeparationClearanceAudit", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CorrectedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CorrectedBy")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<string>("CorrectedClearedBy")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<string>("CorrectedRemarks")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("CorrectionReason")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<int>("EmployeeSeparationClearanceId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("PreviousClearedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("PreviousClearedBy")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<string>("PreviousRemarks")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EmployeeSeparationClearanceId")
+                        .HasDatabaseName("IX_EmployeeSeparationClearanceAudits_ClearanceId");
+
+                    b.ToTable("EmployeeSeparationClearanceAudits");
+                });
+
+            modelBuilder.Entity("GAAMS.Domain.Entities.LeaveBalance", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("AccruedDays")
+                        .HasPrecision(8, 2)
+                        .HasColumnType("numeric(8,2)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("EmployeeId")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("EntitledDays")
+                        .HasPrecision(8, 2)
+                        .HasColumnType("numeric(8,2)");
+
+                    b.Property<string>("LeaveType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<int>("LeaveYear")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("PendingDays")
+                        .HasPrecision(8, 2)
+                        .HasColumnType("numeric(8,2)");
+
+                    b.Property<decimal>("RemainingDays")
+                        .HasPrecision(8, 2)
+                        .HasColumnType("numeric(8,2)");
+
+                    b.Property<decimal>("TakenDays")
+                        .HasPrecision(8, 2)
+                        .HasColumnType("numeric(8,2)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EmployeeId", "LeaveType", "LeaveYear")
+                        .IsUnique()
+                        .HasDatabaseName("IX_LeaveBalances_Employee_LeaveType_Year");
+
+                    b.ToTable("LeaveBalances", t =>
+                        {
+                            t.HasCheckConstraint("CK_LeaveBalances_NonNegativeDays", "\"EntitledDays\" >= 0 AND \"AccruedDays\" >= 0 AND \"TakenDays\" >= 0 AND \"PendingDays\" >= 0 AND \"RemainingDays\" >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("GAAMS.Domain.Entities.LeaveEntitlement", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("EffectiveFrom")
+                        .HasColumnType("date");
+
+                    b.Property<DateTime?>("EffectiveTo")
+                        .HasColumnType("date");
+
+                    b.Property<int>("EmployeeId")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("EntitlementDays")
+                        .HasPrecision(8, 2)
+                        .HasColumnType("numeric(8,2)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("LeaveType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<int>("LeaveYear")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EmployeeId", "LeaveType", "LeaveYear")
+                        .IsUnique()
+                        .HasDatabaseName("IX_LeaveEntitlements_Employee_LeaveType_Year");
+
+                    b.ToTable("LeaveEntitlements", t =>
+                        {
+                            t.HasCheckConstraint("CK_LeaveEntitlements_EntitlementDays", "\"EntitlementDays\" >= 0");
+                        });
+                });
+
             modelBuilder.Entity("GAAMS.Domain.Entities.LeaveRequest", b =>
                 {
                     b.Property<int>("Id")
@@ -456,6 +616,37 @@ namespace GAAMS.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("EmployeeSeparation");
+                });
+
+            modelBuilder.Entity("GAAMS.Domain.Entities.EmployeeSeparationClearanceAudit", b =>
+                {
+                    b.HasOne("GAAMS.Domain.Entities.EmployeeSeparationClearance", null)
+                        .WithMany()
+                        .HasForeignKey("EmployeeSeparationClearanceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("GAAMS.Domain.Entities.LeaveBalance", b =>
+                {
+                    b.HasOne("GAAMS.Domain.Entities.Employee", "Employee")
+                        .WithMany()
+                        .HasForeignKey("EmployeeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Employee");
+                });
+
+            modelBuilder.Entity("GAAMS.Domain.Entities.LeaveEntitlement", b =>
+                {
+                    b.HasOne("GAAMS.Domain.Entities.Employee", "Employee")
+                        .WithMany()
+                        .HasForeignKey("EmployeeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Employee");
                 });
 
             modelBuilder.Entity("GAAMS.Domain.Entities.LeaveRequest", b =>

@@ -23,6 +23,10 @@ interface Employee {
   departmentId: number;
   department?: Department | null;
   isActive: boolean;
+
+  terminationDate?: string | null;
+  terminationReason?: string | null;
+  terminationType?: string | null;
 }
 
 interface EmployeeResponse {
@@ -46,6 +50,8 @@ interface EmployeeRequest {
   departmentId: number;
   isActive: boolean;
 }
+
+type EmployeeStatusFilter = '' | 'active' | 'inactive' | 'terminated';
 
 @Component({
   selector: 'app-employees',
@@ -77,18 +83,20 @@ export class EmployeesComponent implements OnInit {
   isEditing = signal(false);
   editingEmployeeId = signal<number | null>(null);
 
+  editingEmployeeTerminationDate = signal<string | null>(null);
+
   viewingEmployee = signal<Employee | null>(null);
 
   searchTerm = signal('');
   selectedDepartment = signal<number | null>(null);
-  selectedStatus = signal('');
+  selectedStatus = signal<EmployeeStatusFilter>('');
   sortBy = signal('lastName');
 
   today = new Date().toISOString().split('T')[0];
 
   newEmployee: EmployeeRequest = this.emptyForm();
 
-  constructor(private http: HttpClient) {}
+  constructor(private http: HttpClient) { }
 
   ngOnInit(): void {
     this.loadDepartments();
@@ -111,6 +119,11 @@ export class EmployeesComponent implements OnInit {
     };
   }
 
+  // CHECK WHETHER THE EMPLOYEE BEING EDITED IS TERMINATED
+  editingTerminatedEmployee(): boolean {
+    return this.editingEmployeeTerminationDate() !== null;
+  }
+
   // LOAD EMPLOYEES
   loadEmployees(): void {
     this.loading.set(true);
@@ -131,8 +144,21 @@ export class EmployeesComponent implements OnInit {
       params = params.set('departmentId', departmentId);
     }
 
-    if (this.selectedStatus() !== '') {
-      params = params.set('isActive', this.selectedStatus());
+    // EMPLOYEE STATUS FILTER
+    const status = this.selectedStatus();
+
+    if (status === 'active') {
+      params = params.set('isActive', 'true')
+        .set('terminationStatus', 'none');
+    }
+
+    if (status === 'inactive') {
+      params = params.set('isActive', 'false')
+        .set('terminationStatus', 'none');
+    }
+
+    if (status === 'terminated') {
+      params = params.set('terminationStatus', 'terminated');
     }
 
     this.http.get<EmployeeResponse>(this.apiUrl, { params }).subscribe({
@@ -145,7 +171,9 @@ export class EmployeesComponent implements OnInit {
       },
       error: (err) => {
         console.error('Error loading employees:', err);
-        this.error.set('Unable to load employees. Please check that the API is running.');
+        this.error.set(
+          'Unable to load employees. Please check that the API is running.'
+        );
         this.loading.set(false);
       }
     });
@@ -218,6 +246,8 @@ export class EmployeesComponent implements OnInit {
 
     this.isEditing.set(false);
     this.editingEmployeeId.set(null);
+    this.editingEmployeeTerminationDate.set(null);
+
     this.newEmployee = this.emptyForm();
     this.saveError.set('');
 
@@ -228,9 +258,12 @@ export class EmployeesComponent implements OnInit {
   closeForm(): void {
     this.showForm.set(false);
     this.saveError.set('');
+
     this.newEmployee = this.emptyForm();
+
     this.isEditing.set(false);
     this.editingEmployeeId.set(null);
+    this.editingEmployeeTerminationDate.set(null);
   }
 
   // VIEW EMPLOYEE
@@ -250,6 +283,10 @@ export class EmployeesComponent implements OnInit {
     this.isEditing.set(true);
     this.editingEmployeeId.set(employee.id);
 
+    this.editingEmployeeTerminationDate.set(
+      employee.terminationDate ?? null
+    );
+
     this.newEmployee = {
       employeeNumber: employee.employeeNumber,
       firstName: employee.firstName,
@@ -261,7 +298,10 @@ export class EmployeesComponent implements OnInit {
       dateOfEmployment: employee.dateOfEmployment?.substring(0, 10) ?? '',
       jobTitle: employee.jobTitle ?? null,
       departmentId: employee.departmentId,
-      isActive: employee.isActive
+
+      isActive: employee.terminationDate
+        ? false
+        : employee.isActive
     };
 
     this.saveError.set('');
@@ -289,53 +329,74 @@ export class EmployeesComponent implements OnInit {
 
     const request: EmployeeRequest = {
       ...this.newEmployee,
+
       employeeNumber: this.newEmployee.employeeNumber.trim(),
       firstName: this.newEmployee.firstName.trim(),
       lastName: this.newEmployee.lastName.trim(),
+
       nationalId: this.newEmployee.nationalId?.trim() || null,
       email: this.newEmployee.email?.trim() || null,
       phoneNumber: this.newEmployee.phoneNumber?.trim() || null,
       jobTitle: this.newEmployee.jobTitle?.trim() || null,
-      departmentId: Number(this.newEmployee.departmentId)
+
+      departmentId: Number(this.newEmployee.departmentId),
+
+      isActive: this.editingTerminatedEmployee()
+        ? false
+        : this.newEmployee.isActive
     };
 
     const employeeId = this.editingEmployeeId();
 
     if (this.isEditing() && employeeId !== null) {
+
       this.http.put(`${this.apiUrl}/${employeeId}`, request).subscribe({
         next: () => {
           this.saving.set(false);
           this.closeForm();
+
           this.successMessage.set('Employee updated successfully.');
+
           this.loadEmployees();
         },
         error: (err) => {
           console.error('Error updating employee:', err);
+
           this.saveError.set(
-            err.error?.message || 'Unable to update employee. Please check the information and try again.'
+            err.error?.message ||
+            'Unable to update employee. Please check the information and try again.'
           );
+
           this.saving.set(false);
         }
       });
+
     } else {
+
       const { isActive, ...createRequest } = request;
 
       this.http.post(this.apiUrl, createRequest).subscribe({
         next: () => {
           this.saving.set(false);
           this.closeForm();
+
           this.successMessage.set('Employee added successfully.');
+
           this.page.set(1);
           this.loadEmployees();
         },
         error: (err) => {
           console.error('Error creating employee:', err);
+
           this.saveError.set(
-            err.error?.message || 'Unable to add employee. Please check the information and try again.'
+            err.error?.message ||
+            'Unable to add employee. Please check the information and try again.'
           );
+
           this.saving.set(false);
         }
       });
+
     }
   }
 

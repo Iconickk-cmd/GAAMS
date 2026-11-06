@@ -17,6 +17,10 @@ public class GAAMSDbContext : DbContext
 
     public DbSet<LeaveRequest> LeaveRequests { get; set; }
 
+    public DbSet<LeaveEntitlement> LeaveEntitlements { get; set; }
+
+    public DbSet<LeaveBalance> LeaveBalances { get; set; }
+
     public DbSet<Position> Positions { get; set; }
 
     public DbSet<EmployeePositionHistory> EmployeePositionHistories { get; set; }
@@ -122,6 +126,92 @@ public class GAAMSDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(l => l.ReviewedByEmployeeId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // LEAVE ENTITLEMENT CONFIGURATION
+        modelBuilder.Entity<LeaveEntitlement>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.LeaveType)
+                .IsRequired()
+                .HasMaxLength(50);
+
+            entity.Property(e => e.EntitlementDays)
+                .HasPrecision(8, 2);
+
+            entity.Property(e => e.EffectiveFrom)
+                .HasColumnType("date");
+
+            entity.Property(e => e.EffectiveTo)
+                .HasColumnType("date");
+
+            entity.HasOne(e => e.Employee)
+                .WithMany()
+                .HasForeignKey(e => e.EmployeeId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasIndex(e => new
+            {
+                e.EmployeeId,
+                e.LeaveType,
+                e.LeaveYear
+            })
+            .IsUnique()
+            .HasDatabaseName("IX_LeaveEntitlements_Employee_LeaveType_Year");
+
+            entity.ToTable(t =>
+                t.HasCheckConstraint(
+                    "CK_LeaveEntitlements_EntitlementDays",
+                    "\"EntitlementDays\" >= 0"));
+        });
+
+        // LEAVE BALANCE CONFIGURATION
+        modelBuilder.Entity<LeaveBalance>(entity =>
+        {
+            entity.HasKey(b => b.Id);
+
+            entity.Property(b => b.LeaveType)
+                .IsRequired()
+                .HasMaxLength(50);
+
+            entity.Property(b => b.EntitledDays)
+                .HasPrecision(8, 2);
+
+            entity.Property(b => b.AccruedDays)
+                .HasPrecision(8, 2);
+
+            entity.Property(b => b.TakenDays)
+                .HasPrecision(8, 2);
+
+            entity.Property(b => b.PendingDays)
+                .HasPrecision(8, 2);
+
+            entity.Property(b => b.RemainingDays)
+                .HasPrecision(8, 2);
+
+            entity.HasOne(b => b.Employee)
+                .WithMany()
+                .HasForeignKey(b => b.EmployeeId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasIndex(b => new
+            {
+                b.EmployeeId,
+                b.LeaveType,
+                b.LeaveYear
+            })
+            .IsUnique()
+            .HasDatabaseName("IX_LeaveBalances_Employee_LeaveType_Year");
+
+            entity.ToTable(t =>
+                t.HasCheckConstraint(
+                    "CK_LeaveBalances_NonNegativeDays",
+                    "\"EntitledDays\" >= 0 AND " +
+                    "\"AccruedDays\" >= 0 AND " +
+                    "\"TakenDays\" >= 0 AND " +
+                    "\"PendingDays\" >= 0 AND " +
+                    "\"RemainingDays\" >= 0"));
         });
 
         // POSITION CONFIGURATION

@@ -31,6 +31,7 @@ public class EmployeeSeparationsController : ControllerBase
     }
 
     // GET: api/EmployeeSeparations
+    // Retrieve all employee separation requests.
     [HttpGet]
     public async Task<IActionResult> GetSeparations()
     {
@@ -44,6 +45,7 @@ public class EmployeeSeparationsController : ControllerBase
     }
 
     // GET: api/EmployeeSeparations/1
+    // Retrieve a specific employee separation request.
     [HttpGet("{id:int}")]
     public async Task<IActionResult> GetSeparation(int id)
     {
@@ -162,7 +164,7 @@ public class EmployeeSeparationsController : ControllerBase
     }
 
     // POST: api/EmployeeSeparations/1/review
-    // Management approves or rejects a request.
+    // Management approves or rejects a separation request.
     [HttpPost("{id:int}/review")]
     public async Task<IActionResult> ReviewSeparation(
         int id,
@@ -262,7 +264,7 @@ public class EmployeeSeparationsController : ControllerBase
     }
 
     // PUT: api/EmployeeSeparations/1/clearances/1
-    // A department records its clearance.
+    // Complete a departmental clearance.
     [HttpPut("{id:int}/clearances/{clearanceId:int}")]
     public async Task<IActionResult> CompleteClearance(
         int id,
@@ -317,6 +319,14 @@ public class EmployeeSeparationsController : ControllerBase
             });
         }
 
+        if (string.IsNullOrWhiteSpace(request.ClearedBy))
+        {
+            return BadRequest(new
+            {
+                message = "The name of the clearance officer is required."
+            });
+        }
+
         clearance.Status = "Completed";
         clearance.Remarks = request.Remarks?.Trim();
         clearance.ClearedBy = request.ClearedBy.Trim();
@@ -341,8 +351,135 @@ public class EmployeeSeparationsController : ControllerBase
         });
     }
 
+    // PUT: api/EmployeeSeparations/1/clearances/2/correct
+    // Correct a completed clearance and preserve its original details.
+    [HttpPut("{id:int}/clearances/{clearanceId:int}/correct")]
+    public async Task<IActionResult> CorrectClearance(
+        int id,
+        int clearanceId,
+        [FromBody] CorrectEmployeeSeparationClearanceRequest request)
+    {
+        var separation = await _context.EmployeeSeparations
+            .FirstOrDefaultAsync(s => s.Id == id);
+
+        if (separation == null)
+        {
+            return NotFound(new
+            {
+                message = "Employee separation request not found."
+            });
+        }
+
+        if (separation.Status != "PendingClearance")
+        {
+            return BadRequest(new
+            {
+                message = "Clearance corrections are only allowed while the separation is awaiting clearance."
+            });
+        }
+
+        var clearance = await _context.EmployeeSeparationClearances
+            .FirstOrDefaultAsync(c =>
+                c.Id == clearanceId &&
+                c.EmployeeSeparationId == id);
+
+        if (clearance == null)
+        {
+            return NotFound(new
+            {
+                message = "The specified departmental clearance was not found."
+            });
+        }
+
+        if (clearance.Status != "Completed")
+        {
+            return BadRequest(new
+            {
+                message = "Only completed clearances can be corrected."
+            });
+        }
+
+        if (string.IsNullOrWhiteSpace(request.CorrectedClearedBy) ||
+            string.IsNullOrWhiteSpace(request.CorrectedBy) ||
+            string.IsNullOrWhiteSpace(request.CorrectionReason))
+        {
+            return BadRequest(new
+            {
+                message = "Corrected officer, correction reason and person making the correction are required."
+            });
+        }
+
+        await using var transaction =
+            await _context.Database.BeginTransactionAsync();
+
+        var audit = new EmployeeSeparationClearanceAudit
+        {
+            EmployeeSeparationClearanceId = clearance.Id,
+
+            PreviousClearedBy = clearance.ClearedBy ?? "Unknown",
+            PreviousRemarks = clearance.Remarks,
+            PreviousClearedAt = clearance.ClearedAt,
+
+            CorrectedClearedBy = request.CorrectedClearedBy.Trim(),
+            CorrectedRemarks = request.CorrectedRemarks?.Trim(),
+
+            CorrectionReason = request.CorrectionReason.Trim(),
+            CorrectedBy = request.CorrectedBy.Trim(),
+            CorrectedAt = DateTime.UtcNow
+        };
+
+        clearance.ClearedBy = request.CorrectedClearedBy.Trim();
+        clearance.Remarks = request.CorrectedRemarks?.Trim();
+
+        _context.EmployeeSeparationClearanceAudits.Add(audit);
+
+        await _context.SaveChangesAsync();
+        await transaction.CommitAsync();
+
+        return Ok(new
+        {
+            message = "Departmental clearance corrected successfully. Original details have been preserved in the audit history.",
+            clearanceId = clearance.Id,
+            department = clearance.DepartmentName,
+            status = clearance.Status,
+            correctedClearedBy = clearance.ClearedBy,
+            correctedRemarks = clearance.Remarks,
+            correctedBy = audit.CorrectedBy,
+            correctedAt = audit.CorrectedAt,
+            auditId = audit.Id
+        });
+    }
+
+    // GET: api/EmployeeSeparations/1/clearances/2/audit
+    // Retrieve the correction history for a departmental clearance.
+    [HttpGet("{id:int}/clearances/{clearanceId:int}/audit")]
+    public async Task<IActionResult> GetClearanceAuditHistory(
+        int id,
+        int clearanceId)
+    {
+        var clearanceExists = await _context.EmployeeSeparationClearances
+            .AnyAsync(c =>
+                c.Id == clearanceId &&
+                c.EmployeeSeparationId == id);
+
+        if (!clearanceExists)
+        {
+            return NotFound(new
+            {
+                message = "The specified departmental clearance was not found."
+            });
+        }
+
+        var auditHistory = await _context.EmployeeSeparationClearanceAudits
+            .Where(a => a.EmployeeSeparationClearanceId == clearanceId)
+            .OrderByDescending(a => a.CorrectedAt)
+            .ToListAsync();
+
+        return Ok(auditHistory);
+    }
+
     // POST: api/EmployeeSeparations/1/finalize
-    // Finalize separation after all departmental clearances.
+    // Finalize separation only after all required clearances are complete.
     [HttpPost("{id:int}/finalize")]
     public async Task<IActionResult> FinalizeSeparation(
         int id,
@@ -413,15 +550,24 @@ public class EmployeeSeparationsController : ControllerBase
             });
         }
 
-        // Finalization is the only operation that terminates the employee.
+        if (string.IsNullOrWhiteSpace(request.FinalizedBy))
+        {
+            return BadRequest(new
+            {
+                message = "The name of the person finalizing the separation is required."
+            });
+        }
+
         employee.IsActive = false;
+
         employee.TerminationDate = DateTime.SpecifyKind(
             separation.ProposedLastWorkingDate.Date,
             DateTimeKind.Utc);
+
         employee.TerminationReason = separation.Reason;
         employee.TerminationType = separation.SeparationType;
 
-        // Close any current position assignment.
+        // Close the employee's current position assignment.
         var currentAssignment = await _context.EmployeePositionHistories
             .FirstOrDefaultAsync(h =>
                 h.EmployeeId == employee.Id &&

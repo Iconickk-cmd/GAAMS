@@ -1,6 +1,5 @@
 ﻿
 using Microsoft.EntityFrameworkCore;
-using Npgsql;
 using GAAMS.API.DTOs;
 using GAAMS.Domain.Entities;
 using GAAMS.Infrastructure.Data;
@@ -27,19 +26,27 @@ public class EmployeesController : ControllerBase
         [FromQuery] string? search = null,
         [FromQuery] int? departmentId = null,
         [FromQuery] bool? isActive = null,
+        [FromQuery] string? terminationStatus = null,
         [FromQuery] string sortBy = "lastName")
     {
         if (page < 1)
-            return BadRequest(new { message = "Page must be greater than or equal to 1." });
+            return BadRequest(new
+            {
+                message = "Page must be greater than or equal to 1."
+            });
 
         if (pageSize < 1 || pageSize > 100)
-            return BadRequest(new { message = "Page size must be between 1 and 100." });
+            return BadRequest(new
+            {
+                message = "Page size must be between 1 and 100."
+            });
 
         var query = _context.Employees
             .AsNoTracking()
             .Include(e => e.Department)
             .AsQueryable();
 
+        // SEARCH FILTER
         if (!string.IsNullOrWhiteSpace(search))
         {
             var searchTerm = search.Trim();
@@ -48,43 +55,90 @@ public class EmployeesController : ControllerBase
                 e.FirstName.Contains(searchTerm) ||
                 e.LastName.Contains(searchTerm) ||
                 e.EmployeeNumber.Contains(searchTerm) ||
-                (e.NationalId != null && e.NationalId.Contains(searchTerm)) ||
-                (e.Email != null && e.Email.Contains(searchTerm)));
+                (e.NationalId != null &&
+                 e.NationalId.Contains(searchTerm)) ||
+                (e.Email != null &&
+                 e.Email.Contains(searchTerm)));
         }
 
+        // DEPARTMENT FILTER
         if (departmentId.HasValue)
         {
             if (departmentId.Value < 1)
-                return BadRequest(new { message = "Department ID must be greater than or equal to 1." });
+            {
+                return BadRequest(new
+                {
+                    message = "Department ID must be greater than or equal to 1."
+                });
+            }
 
-            query = query.Where(e => e.DepartmentId == departmentId.Value);
+            query = query.Where(e =>
+                e.DepartmentId == departmentId.Value);
         }
 
+        // EMPLOYEE ACTIVE STATUS FILTER
         if (isActive.HasValue)
-            query = query.Where(e => e.IsActive == isActive.Value);
+        {
+            query = query.Where(e =>
+                e.IsActive == isActive.Value);
+        }
 
+        // TERMINATION STATUS FILTER
+        if (!string.IsNullOrWhiteSpace(terminationStatus))
+        {
+            var normalizedStatus =
+                terminationStatus.Trim().ToLowerInvariant();
+
+            switch (normalizedStatus)
+            {
+                case "none":
+                    // Employees who have not been terminated.
+                    query = query.Where(e =>
+                        e.TerminationDate == null);
+                    break;
+
+                case "terminated":
+                    // Employees with a recorded termination date.
+                    query = query.Where(e =>
+                        e.TerminationDate != null);
+                    break;
+
+                default:
+                    return BadRequest(new
+                    {
+                        message = "Invalid terminationStatus value. Use none or terminated."
+                    });
+            }
+        }
+
+        // COUNT AFTER ALL FILTERS
         var totalCount = await query.CountAsync();
 
+        // SORTING
         switch (sortBy.Trim().ToLowerInvariant())
         {
             case "firstname":
-                query = query.OrderBy(e => e.FirstName)
+                query = query
+                    .OrderBy(e => e.FirstName)
                     .ThenBy(e => e.LastName)
                     .ThenBy(e => e.Id);
                 break;
 
             case "employeenumber":
-                query = query.OrderBy(e => e.EmployeeNumber)
+                query = query
+                    .OrderBy(e => e.EmployeeNumber)
                     .ThenBy(e => e.Id);
                 break;
 
             case "dateofemployment":
-                query = query.OrderBy(e => e.DateOfEmployment)
+                query = query
+                    .OrderBy(e => e.DateOfEmployment)
                     .ThenBy(e => e.Id);
                 break;
 
             case "lastname":
-                query = query.OrderBy(e => e.LastName)
+                query = query
+                    .OrderBy(e => e.LastName)
                     .ThenBy(e => e.FirstName)
                     .ThenBy(e => e.Id);
                 break;
@@ -96,6 +150,7 @@ public class EmployeesController : ControllerBase
                 });
         }
 
+        // PAGINATION
         var employees = await query
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
@@ -106,7 +161,8 @@ public class EmployeesController : ControllerBase
             page,
             pageSize,
             totalCount,
-            totalPages = (int)Math.Ceiling(totalCount / (double)pageSize),
+            totalPages = (int)Math.Ceiling(
+                totalCount / (double)pageSize),
             employees
         });
     }
@@ -131,34 +187,42 @@ public class EmployeesController : ControllerBase
         [FromBody] CreateEmployeeRequest request)
     {
         var employeeNumberExists = await _context.Employees
-            .AnyAsync(e => e.EmployeeNumber == request.EmployeeNumber);
+            .AnyAsync(e =>
+                e.EmployeeNumber == request.EmployeeNumber);
 
         if (employeeNumberExists)
+        {
             return Conflict(new
             {
                 message = "An employee with this employee number already exists."
             });
+        }
 
         if (!string.IsNullOrWhiteSpace(request.NationalId))
         {
             var nationalIdExists = await _context.Employees
-                .AnyAsync(e => e.NationalId == request.NationalId);
+                .AnyAsync(e =>
+                    e.NationalId == request.NationalId);
 
             if (nationalIdExists)
+            {
                 return Conflict(new
                 {
                     message = "An employee with this National ID already exists."
                 });
+            }
         }
 
         var departmentExists = await _context.Departments
             .AnyAsync(d => d.Id == request.DepartmentId);
 
         if (!departmentExists)
+        {
             return BadRequest(new
             {
                 message = "The selected department does not exist."
             });
+        }
 
         var employee = new Employee
         {
@@ -195,7 +259,8 @@ public class EmployeesController : ControllerBase
         if (employee == null)
             return NotFound();
 
-        if (employee.TerminationDate.HasValue)
+        // Prevent reactivation of a terminated employee.
+        if (employee.TerminationDate.HasValue && request.IsActive)
         {
             return BadRequest(new
             {
@@ -209,10 +274,12 @@ public class EmployeesController : ControllerBase
                 e.Id != id);
 
         if (employeeNumberExists)
+        {
             return Conflict(new
             {
                 message = "Another employee already uses this employee number."
             });
+        }
 
         if (!string.IsNullOrWhiteSpace(request.NationalId))
         {
@@ -222,21 +289,26 @@ public class EmployeesController : ControllerBase
                     e.Id != id);
 
             if (nationalIdExists)
+            {
                 return Conflict(new
                 {
                     message = "Another employee already uses this National ID."
                 });
+            }
         }
 
         var departmentExists = await _context.Departments
             .AnyAsync(d => d.Id == request.DepartmentId);
 
         if (!departmentExists)
+        {
             return BadRequest(new
             {
                 message = "The selected department does not exist."
             });
+        }
 
+        // Update ordinary employee profile details.
         employee.EmployeeNumber = request.EmployeeNumber;
         employee.FirstName = request.FirstName;
         employee.LastName = request.LastName;
@@ -247,7 +319,14 @@ public class EmployeesController : ControllerBase
         employee.DateOfEmployment = request.DateOfEmployment;
         employee.JobTitle = request.JobTitle;
         employee.DepartmentId = request.DepartmentId;
-        employee.IsActive = request.IsActive;
+
+        // A terminated employee must always remain inactive.
+        employee.IsActive = employee.TerminationDate.HasValue
+            ? false
+            : request.IsActive;
+
+        // Termination information is not changed through
+        // ordinary employee profile editing.
 
         await _context.SaveChangesAsync();
 
@@ -265,18 +344,38 @@ public class EmployeesController : ControllerBase
         [FromBody] TerminateEmployeeRequest request)
     {
         if (request.TerminationDate == default)
-            return BadRequest(new { message = "A valid termination date is required." });
+        {
+            return BadRequest(new
+            {
+                message = "A valid termination date is required."
+            });
+        }
 
         var terminationDate = request.TerminationDate.Date;
 
         if (terminationDate > DateTime.UtcNow.Date)
-            return BadRequest(new { message = "The termination date cannot be in the future." });
+        {
+            return BadRequest(new
+            {
+                message = "The termination date cannot be in the future."
+            });
+        }
 
         if (string.IsNullOrWhiteSpace(request.TerminationReason))
-            return BadRequest(new { message = "A termination reason is required." });
+        {
+            return BadRequest(new
+            {
+                message = "A termination reason is required."
+            });
+        }
 
         if (string.IsNullOrWhiteSpace(request.TerminationType))
-            return BadRequest(new { message = "A termination type is required." });
+        {
+            return BadRequest(new
+            {
+                message = "A termination type is required."
+            });
+        }
 
         await using var transaction =
             await _context.Database.BeginTransactionAsync();
@@ -289,24 +388,37 @@ public class EmployeesController : ControllerBase
             if (employee == null)
             {
                 await transaction.RollbackAsync();
-                return NotFound(new { message = "Employee was not found." });
+
+                return NotFound(new
+                {
+                    message = "Employee was not found."
+                });
             }
 
             if (employee.TerminationDate.HasValue)
             {
                 await transaction.RollbackAsync();
-                return Conflict(new { message = "This employee has already been terminated." });
+
+                return Conflict(new
+                {
+                    message = "This employee has already been terminated."
+                });
             }
 
             if (!employee.IsActive)
             {
                 await transaction.RollbackAsync();
-                return BadRequest(new { message = "This employee is already inactive." });
+
+                return BadRequest(new
+                {
+                    message = "This employee is already inactive."
+                });
             }
 
             if (terminationDate < employee.DateOfEmployment.Date)
             {
                 await transaction.RollbackAsync();
+
                 return BadRequest(new
                 {
                     message = "The termination date cannot be before the employment date."
@@ -322,6 +434,7 @@ public class EmployeesController : ControllerBase
                 terminationDate < currentAssignment.StartDate.Date)
             {
                 await transaction.RollbackAsync();
+
                 return BadRequest(new
                 {
                     message = "The termination date cannot be before the current assignment start date."
@@ -329,10 +442,17 @@ public class EmployeesController : ControllerBase
             }
 
             employee.IsActive = false;
+
             employee.TerminationDate =
-                DateTime.SpecifyKind(terminationDate, DateTimeKind.Utc);
-            employee.TerminationReason = request.TerminationReason.Trim();
-            employee.TerminationType = request.TerminationType.Trim();
+                DateTime.SpecifyKind(
+                    terminationDate,
+                    DateTimeKind.Utc);
+
+            employee.TerminationReason =
+                request.TerminationReason.Trim();
+
+            employee.TerminationType =
+                request.TerminationType.Trim();
 
             if (currentAssignment != null)
             {
@@ -359,6 +479,7 @@ public class EmployeesController : ControllerBase
         catch (DbUpdateException)
         {
             await transaction.RollbackAsync();
+
             return Conflict(new
             {
                 message = "The termination could not be completed because of a database update conflict."
@@ -378,16 +499,31 @@ public class EmployeesController : ControllerBase
         [FromBody] CorrectTerminationDetailsRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.TerminationReason))
-            return BadRequest(new { message = "A termination reason is required." });
+        {
+            return BadRequest(new
+            {
+                message = "A termination reason is required."
+            });
+        }
 
         if (string.IsNullOrWhiteSpace(request.TerminationType))
-            return BadRequest(new { message = "A termination type is required." });
+        {
+            return BadRequest(new
+            {
+                message = "A termination type is required."
+            });
+        }
 
         var employee = await _context.Employees
             .FirstOrDefaultAsync(e => e.Id == id);
 
         if (employee == null)
-            return NotFound(new { message = "Employee was not found." });
+        {
+            return NotFound(new
+            {
+                message = "Employee was not found."
+            });
+        }
 
         if (employee.IsActive || !employee.TerminationDate.HasValue)
         {
@@ -397,8 +533,11 @@ public class EmployeesController : ControllerBase
             });
         }
 
-        employee.TerminationReason = request.TerminationReason.Trim();
-        employee.TerminationType = request.TerminationType.Trim();
+        employee.TerminationReason =
+            request.TerminationReason.Trim();
+
+        employee.TerminationType =
+            request.TerminationType.Trim();
 
         await _context.SaveChangesAsync();
 
@@ -426,6 +565,7 @@ public class EmployeesController : ControllerBase
             return NotFound();
 
         _context.Employees.Remove(employee);
+
         await _context.SaveChangesAsync();
 
         return NoContent();

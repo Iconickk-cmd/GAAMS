@@ -51,8 +51,9 @@
         <div>
           <h3>{{ employee.firstName }} {{ employee.lastName }}</h3>
           <p>{{ employee.jobTitle || 'Job title not specified' }}</p>
-          <span class="status-badge" [class.inactive]="!employee.isActive">
-            {{ employee.isActive ? 'Active' : 'Inactive' }}
+          <span class="status-badge"
+                [class.inactive]="!employee.isActive">
+            {{ employee.terminationDate ? 'Terminated' : employee.isActive ? 'Active' : 'Inactive' }}
           </span>
         </div>
       </div>
@@ -111,8 +112,27 @@
 
         <div class="detail-item">
           <span>Employment Status</span>
-          <strong>{{ employee.isActive ? 'Active' : 'Inactive' }}</strong>
+          <strong>
+            {{ employee.terminationDate ? 'Terminated' : employee.isActive ? 'Active' : 'Inactive' }}
+          </strong>
         </div>
+
+        @if (employee.terminationDate) {
+        <div class="detail-item">
+          <span>Termination Date</span>
+          <strong>{{ employee.terminationDate | date:'dd MMM yyyy' }}</strong>
+        </div>
+
+        <div class="detail-item">
+          <span>Termination Type</span>
+          <strong>{{ employee.terminationType || 'Not specified' }}</strong>
+        </div>
+
+        <div class="detail-item">
+          <span>Termination Reason</span>
+          <strong>{{ employee.terminationReason || 'Not specified' }}</strong>
+        </div>
+        }
 
       </div>
 
@@ -121,7 +141,8 @@
           Close
         </button>
 
-        <button class="add-button" type="button" (click)="editEmployee(employee)">
+        <button class="add-button" type="button"
+                (click)="editEmployee(employee)">
           Edit Employee
         </button>
       </div>
@@ -158,19 +179,22 @@
         <div class="form-group">
           <label for="employeeNumber">Employee Number *</label>
           <input id="employeeNumber" type="text" name="employeeNumber"
-                 [(ngModel)]="newEmployee.employeeNumber" maxlength="50" required>
+                 [(ngModel)]="newEmployee.employeeNumber"
+                 maxlength="50" required>
         </div>
 
         <div class="form-group">
           <label for="firstName">First Name *</label>
           <input id="firstName" type="text" name="firstName"
-                 [(ngModel)]="newEmployee.firstName" maxlength="100" required>
+                 [(ngModel)]="newEmployee.firstName"
+                 maxlength="100" required>
         </div>
 
         <div class="form-group">
           <label for="lastName">Last Name *</label>
           <input id="lastName" type="text" name="lastName"
-                 [(ngModel)]="newEmployee.lastName" maxlength="100" required>
+                 [(ngModel)]="newEmployee.lastName"
+                 maxlength="100" required>
         </div>
 
         <div class="form-group">
@@ -182,7 +206,8 @@
         <div class="form-group">
           <label for="email">Email Address</label>
           <input id="email" type="email" name="email"
-                 [(ngModel)]="newEmployee.email" maxlength="254" email>
+                 [(ngModel)]="newEmployee.email"
+                 maxlength="254" email>
         </div>
 
         <div class="form-group">
@@ -194,13 +219,15 @@
         <div class="form-group">
           <label for="dateOfBirth">Date of Birth *</label>
           <input id="dateOfBirth" type="date" name="dateOfBirth"
-                 [(ngModel)]="newEmployee.dateOfBirth" [max]="today" required>
+                 [(ngModel)]="newEmployee.dateOfBirth"
+                 [max]="today" required>
         </div>
 
         <div class="form-group">
           <label for="dateOfEmployment">Date of Employment *</label>
           <input id="dateOfEmployment" type="date" name="dateOfEmployment"
-                 [(ngModel)]="newEmployee.dateOfEmployment" [max]="today" required>
+                 [(ngModel)]="newEmployee.dateOfEmployment"
+                 [max]="today" required>
         </div>
 
         <div class="form-group">
@@ -220,7 +247,8 @@
           </select>
         </div>
 
-        @if (isEditing()) {
+        <!-- EMPLOYEE STATUS -->
+        @if (isEditing() && !editingTerminatedEmployee()) {
         <div class="form-group">
           <label for="isActive">Employee Status *</label>
           <select id="isActive" name="isActive"
@@ -228,6 +256,20 @@
             <option [ngValue]="true">Active</option>
             <option [ngValue]="false">Inactive</option>
           </select>
+        </div>
+        }
+
+        <!-- TERMINATED EMPLOYEE STATUS -->
+        @if (isEditing() && editingTerminatedEmployee()) {
+        <div class="form-group">
+          <label for="employeeStatus">Employee Status</label>
+          <input id="employeeStatus" type="text"
+                 value="Terminated" disabled>
+
+          <small>
+            A terminated employee cannot be reactivated through
+            employee profile editing.
+          </small>
         </div>
         }
 
@@ -295,14 +337,16 @@
         </select>
       </div>
 
+      <!-- EMPLOYEE STATUS FILTER -->
       <div class="filter-group">
         <label for="statusFilter">Status</label>
         <select id="statusFilter"
                 [ngModel]="selectedStatus()"
                 (ngModelChange)="selectedStatus.set($event); filterEmployees()">
           <option value="">All Statuses</option>
-          <option value="true">Active</option>
-          <option value="false">Inactive</option>
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+          <option value="terminated">Terminated</option>
         </select>
       </div>
 
@@ -357,8 +401,9 @@
             <td>{{ employee.jobTitle || '—' }}</td>
 
             <td>
-              <span class="status-badge" [class.inactive]="!employee.isActive">
-                {{ employee.isActive ? 'Active' : 'Inactive' }}
+              <span class="status-badge"
+                    [class.inactive]="!employee.isActive">
+                {{ employee.terminationDate ? 'Terminated' : employee.isActive ? 'Active' : 'Inactive' }}
               </span>
             </td>
 

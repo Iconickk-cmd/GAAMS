@@ -1,198 +1,574 @@
 
 <div class="leave-page">
 
+  <!-- PAGE HEADER -->
   <div class="page-header">
     <div>
+      <span class="eyebrow">GAAMS / HUMAN RESOURCES</span>
       <h1>Leave Management</h1>
-      <p>Manage employee leave requests, approvals and cancellations.</p>
+      <p>Monitor employee leave, manage requests and oversee approvals.</p>
     </div>
 
-    <button class="refresh-button" type="button" (click)="loadLeaveRequests()">
-      Refresh Requests
+    <button class="refresh-button" type="button"
+            (click)="loadLeaveRequests()">
+      <span>↻</span> Refresh Data
     </button>
   </div>
 
+  <!-- STATISTICS -->
   <div class="statistics-grid">
-    <div class="stat-card">
-      <span>Total Requests</span>
-      <strong>{{ leaveRequests().length }}</strong>
+
+    <div class="stat-card total">
+      <div class="stat-icon">▤</div>
+      <div>
+        <span>Total Requests</span>
+        <strong>{{ totalRequests }}</strong>
+        <small>All submitted requests</small>
+      </div>
     </div>
 
     <div class="stat-card pending">
-      <span>Pending</span>
-      <strong>{{ countByStatus('Pending') }}</strong>
+      <div class="stat-icon">◷</div>
+      <div>
+        <span>Pending Requests</span>
+        <strong>{{ pendingRequests }}</strong>
+        <small>Awaiting review</small>
+      </div>
     </div>
 
     <div class="stat-card approved">
-      <span>Approved</span>
-      <strong>{{ countByStatus('Approved') }}</strong>
+      <div class="stat-icon">✓</div>
+      <div>
+        <span>Approved Requests</span>
+        <strong>{{ approvedRequests }}</strong>
+        <small>Successfully approved</small>
+      </div>
     </div>
 
     <div class="stat-card rejected">
-      <span>Rejected</span>
-      <strong>{{ countByStatus('Rejected') }}</strong>
+      <div class="stat-icon">×</div>
+      <div>
+        <span>Rejected Requests</span>
+        <strong>{{ rejectedRequests }}</strong>
+        <small>Requests declined</small>
+      </div>
     </div>
 
     <div class="stat-card cancelled">
-      <span>Cancelled</span>
-      <strong>{{ countByStatus('Cancelled') }}</strong>
+      <div class="stat-icon">−</div>
+      <div>
+        <span>Cancelled Requests</span>
+        <strong>{{ cancelledRequests }}</strong>
+        <small>Cancelled requests</small>
+      </div>
     </div>
+
   </div>
 
+  <!-- EMPLOYEE LEAVE BALANCES -->
+  <section class="balance-section">
+
+    <div class="section-heading">
+      <div>
+        <span class="section-label">WORKFORCE BENEFITS</span>
+        <h2>Employee Leave Balances</h2>
+        <p>Monitor employee leave entitlement, usage and available days.</p>
+      </div>
+
+      <button class="refresh-button"
+              type="button"
+              (click)="loadLeaveBalances()"
+              [disabled]="balanceLoading()">
+        ↻ Refresh Balance
+      </button>
+    </div>
+
+    <!-- EMPLOYEE AND YEAR FILTERS -->
+    <div class="balance-filters">
+
+      <div class="form-group">
+        <label for="balanceEmployee">Select Employee</label>
+
+        <select id="balanceEmployee"
+                name="balanceEmployee"
+                [(ngModel)]="selectedBalanceEmployeeId"
+                (ngModelChange)="onBalanceEmployeeChange()">
+
+          <option [ngValue]="0">Select employee</option>
+
+          @for (employee of employees(); track employee.id) {
+          <option [ngValue]="employee.id">
+            {{ employee.firstName }} {{ employee.lastName }}
+            — {{ employee.employeeNumber }}
+          </option>
+          }
+
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="balanceYear">Leave Year</label>
+
+        <input id="balanceYear"
+               name="balanceYear"
+               type="number"
+               min="2000"
+               max="2100"
+               [(ngModel)]="balanceYear"
+               (ngModelChange)="onBalanceYearChange()">
+      </div>
+
+    </div>
+
+    <!-- BALANCE LOADING -->
+    @if (balanceLoading()) {
+
+    <div class="loading-state">
+      <div class="loader"></div>
+      <p>Loading employee leave balances...</p>
+    </div>
+
+    } @else if (selectedBalanceEmployeeId <= 0) {
+
+    <div class="empty-state">
+      <div class="empty-icon">▤</div>
+      <h3>Select an employee</h3>
+      <p>Select an employee to view their leave balances.</p>
+    </div>
+
+    } @else if (leaveBalances().length === 0) {
+
+    <div class="empty-state">
+      <div class="empty-icon">▤</div>
+      <h3>No leave balances found</h3>
+      <p>
+        No leave balance records were found for
+        {{ selectedBalanceEmployee?.firstName }}
+        {{ selectedBalanceEmployee?.lastName }}
+        in {{ balanceYear }}.
+      </p>
+    </div>
+
+    } @else {
+
+    <!-- EMPLOYEE INFORMATION -->
+    <div class="balance-employee-info">
+      <div class="employee-avatar">
+        {{ selectedBalanceEmployee?.firstName?.charAt(0) }}
+      </div>
+
+      <div>
+        <strong>
+          {{ selectedBalanceEmployee?.firstName }}
+          {{ selectedBalanceEmployee?.lastName }}
+        </strong>
+
+        <small>
+          {{ selectedBalanceEmployee?.employeeNumber }}
+          · Leave Year {{ balanceYear }}
+        </small>
+      </div>
+    </div>
+
+    <!-- BALANCE SUMMARY CARDS -->
+    <div class="balance-summary-grid">
+
+      <div class="balance-card">
+        <span>Entitled Days</span>
+        <strong>{{ totalEntitledDays | number:'1.2-2' }}</strong>
+        <small>Total allocated leave</small>
+      </div>
+
+      <div class="balance-card">
+        <span>Accrued Days</span>
+        <strong>{{ totalAccruedDays | number:'1.2-2' }}</strong>
+        <small>Leave earned</small>
+      </div>
+
+      <div class="balance-card">
+        <span>Taken Days</span>
+        <strong>{{ totalTakenDays | number:'1.2-2' }}</strong>
+        <small>Approved leave taken</small>
+      </div>
+
+      <div class="balance-card">
+        <span>Pending Days</span>
+        <strong>{{ totalPendingDays | number:'1.2-2' }}</strong>
+        <small>Awaiting approval</small>
+      </div>
+
+      <div class="balance-card remaining">
+        <span>Remaining Days</span>
+        <strong>{{ totalRemainingDays | number:'1.2-2' }}</strong>
+        <small>Available leave balance</small>
+      </div>
+
+    </div>
+
+    <!-- INDIVIDUAL LEAVE TYPE BREAKDOWN -->
+    <div class="balance-table-container">
+
+      <h3>Leave Type Breakdown</h3>
+
+      <table class="balance-table">
+
+        <thead>
+          <tr>
+            <th>LEAVE TYPE</th>
+            <th>ENTITLED</th>
+            <th>ACCRUED</th>
+            <th>TAKEN</th>
+            <th>PENDING</th>
+            <th>REMAINING</th>
+          </tr>
+        </thead>
+
+        <tbody>
+
+          @for (balance of leaveBalances(); track balance.id) {
+
+          <tr>
+            <td>
+              <strong>{{ balance.leaveType }}</strong>
+            </td>
+
+            <td>{{ balance.entitledDays | number:'1.2-2' }}</td>
+
+            <td>{{ balance.accruedDays | number:'1.2-2' }}</td>
+
+            <td>{{ balance.takenDays | number:'1.2-2' }}</td>
+
+            <td>{{ balance.pendingDays | number:'1.2-2' }}</td>
+
+            <td>
+              <strong class="remaining-value">
+                {{ balance.remainingDays | number:'1.2-2' }}
+              </strong>
+            </td>
+          </tr>
+
+          }
+
+        </tbody>
+
+      </table>
+
+    </div>
+
+    }
+
+  </section>
+
+  <!-- NOTIFICATIONS -->
   @if (successMessage()) {
   <div class="message success-message">
+    <span>✓</span>
     {{ successMessage() }}
+    <button type="button" (click)="clearMessages()">×</button>
   </div>
   }
 
   @if (errorMessage()) {
   <div class="message error-message">
+    <span>!</span>
     {{ errorMessage() }}
+    <button type="button" (click)="clearMessages()">×</button>
   </div>
   }
 
-  <section class="form-section">
-    <div class="section-heading">
-      <h2>Submit Leave Request</h2>
-      <p>Complete the form below to submit a new employee leave request.</p>
-    </div>
+  <!-- MAIN CONTENT -->
+  <div class="content-grid">
 
-    <form (ngSubmit)="submitLeaveRequest()">
+    <!-- NEW LEAVE REQUEST -->
+    <section class="form-section">
 
-      <div class="form-grid">
-
-        <div class="form-group">
-          <label for="employeeId">Employee</label>
-          <select id="employeeId"
-                  name="employeeId"
-                  [(ngModel)]="newRequest.employeeId"
-                  required>
-            <option [ngValue]="0" disabled>Select employee</option>
-            @for (employee of employees(); track employee.id) {
-            <option [ngValue]="employee.id">
-              {{ employee.firstName }} {{ employee.lastName }}
-              ({{ employee.employeeNumber }})
-            </option>
-            }
-          </select>
+      <div class="section-heading">
+        <div>
+          <span class="section-label">NEW APPLICATION</span>
+          <h2>Submit Leave Request</h2>
+          <p>Complete the details to register an employee leave request.</p>
         </div>
 
-        <div class="form-group">
-          <label for="leaveType">Leave Type</label>
-          <select id="leaveType"
-                  name="leaveType"
-                  [(ngModel)]="newRequest.leaveType"
-                  required>
-            <option value="Annual">Annual Leave</option>
-            <option value="Sick">Sick Leave</option>
-            <option value="Compassionate">Compassionate Leave</option>
-            <option value="Maternity">Maternity Leave</option>
-            <option value="Paternity">Paternity Leave</option>
-            <option value="Unpaid">Unpaid Leave</option>
-          </select>
-        </div>
-
-        <div class="form-group">
-          <label for="startDate">Start Date</label>
-          <input id="startDate"
-                 type="date"
-                 name="startDate"
-                 [(ngModel)]="newRequest.startDate"
-                 required>
-        </div>
-
-        <div class="form-group">
-          <label for="endDate">End Date</label>
-          <input id="endDate"
-                 type="date"
-                 name="endDate"
-                 [(ngModel)]="newRequest.endDate"
-                 required>
-        </div>
-
-        <div class="form-group full-width">
-          <label for="reason">Reason</label>
-          <textarea id="reason"
-                    name="reason"
-                    rows="3"
-                    maxlength="1000"
-                    placeholder="Enter the reason for this leave request"
-                    [(ngModel)]="newRequest.reason"
-                    required></textarea>
-        </div>
-
+        <div class="heading-icon">＋</div>
       </div>
 
-      <button class="submit-button" type="submit">
-        Submit Leave Request
-      </button>
+      <form (ngSubmit)="submitLeaveRequest()">
 
-    </form>
-  </section>
+        <div class="form-grid">
 
+          <div class="form-group full-width">
+            <label for="employeeId">Select Employee</label>
+
+            <select id="employeeId"
+                    name="employeeId"
+                    [(ngModel)]="newRequest.employeeId"
+                    required>
+
+              <option [ngValue]="0" disabled>
+                Choose an employee
+              </option>
+
+              @for (employee of employees(); track employee.id) {
+              <option [ngValue]="employee.id">
+                {{ employee.firstName }} {{ employee.lastName }}
+                — {{ employee.employeeNumber }}
+              </option>
+              }
+
+            </select>
+          </div>
+
+          <div class="form-group full-width">
+            <label for="leaveType">Leave Category</label>
+
+            <select id="leaveType"
+                    name="leaveType"
+                    [(ngModel)]="newRequest.leaveType"
+                    required>
+
+              <option value="Annual">Annual Leave</option>
+              <option value="Sick">Sick Leave</option>
+              <option value="Compassionate">Compassionate Leave</option>
+              <option value="Maternity">Maternity Leave</option>
+              <option value="Paternity">Paternity Leave</option>
+              <option value="Unpaid">Unpaid Leave</option>
+
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="startDate">Start Date</label>
+
+            <input id="startDate"
+                   type="date"
+                   name="startDate"
+                   [(ngModel)]="newRequest.startDate"
+                   required>
+          </div>
+
+          <div class="form-group">
+            <label for="endDate">End Date</label>
+
+            <input id="endDate"
+                   type="date"
+                   name="endDate"
+                   [(ngModel)]="newRequest.endDate"
+                   [min]="newRequest.startDate || null"
+                   required>
+          </div>
+
+          <div class="form-group full-width">
+            <label for="reason">Reason for Leave</label>
+
+            <textarea id="reason"
+                      name="reason"
+                      rows="4"
+                      maxlength="1000"
+                      placeholder="Provide details about the leave request..."
+                      [(ngModel)]="newRequest.reason"
+                      required></textarea>
+
+            <small class="field-hint">
+              Maximum 1,000 characters.
+            </small>
+          </div>
+
+        </div>
+
+        <div class="form-footer">
+          <button class="submit-button"
+                  type="submit"
+                  [disabled]="submitting()">
+
+            {{ submitting() ? 'Submitting...' : 'Submit Leave Request' }}
+
+            @if (!submitting()) {
+            <span>→</span>
+            }
+
+          </button>
+        </div>
+
+      </form>
+
+    </section>
+
+    <!-- REVIEWER SETTINGS -->
+    <section class="reviewer-section">
+
+      <div class="section-heading">
+        <div>
+          <span class="section-label">APPROVAL MANAGEMENT</span>
+          <h2>Review Settings</h2>
+          <p>Select the employee reviewing leave requests.</p>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="reviewerEmployeeId">Reviewing Employee</label>
+
+        <select id="reviewerEmployeeId"
+                name="reviewerEmployeeId"
+                [(ngModel)]="reviewerEmployeeId">
+
+          <option [ngValue]="0">Select reviewer</option>
+
+          @for (employee of employees(); track employee.id) {
+          <option [ngValue]="employee.id">
+            {{ employee.firstName }} {{ employee.lastName }}
+            ({{ employee.employeeNumber }})
+          </option>
+          }
+
+        </select>
+      </div>
+
+      <div class="review-info">
+        <span class="info-icon">i</span>
+        <p>
+          Select an authorized reviewer before approving or rejecting
+          a pending leave request. Actual approval permissions must
+          also be enforced by the backend.
+        </p>
+      </div>
+
+      <div class="review-summary">
+        <div>
+          <span>Pending Review</span>
+          <strong>{{ pendingRequests }}</strong>
+        </div>
+        <div>
+          <span>Completed Reviews</span>
+          <strong>{{ approvedRequests + rejectedRequests }}</strong>
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <!-- LEAVE REQUESTS TABLE -->
   <section class="requests-section">
 
     <div class="section-heading requests-heading">
+
       <div>
-        <h2>Leave Requests</h2>
-        <p>View and manage submitted employee leave requests.</p>
+        <span class="section-label">WORKFORCE RECORDS</span>
+        <h2>Employee Leave Requests</h2>
+        <p>Review, monitor and manage employee leave applications.</p>
+      </div>
+
+      <div class="table-total">
+        <strong>{{ filteredRequests().length }}</strong>
+        <span>Records displayed</span>
+      </div>
+
+    </div>
+
+    <!-- SEARCH AND FILTER -->
+    <div class="table-toolbar">
+
+      <div class="search-box">
+        <span>⌕</span>
+
+        <input type="search"
+               name="searchTerm"
+               placeholder="Search employee, leave type or request ID..."
+               [(ngModel)]="searchTerm">
       </div>
 
       <div class="filter-group">
-        <label for="statusFilter">Filter by status</label>
+
+        <label for="statusFilter">Status</label>
+
         <select id="statusFilter"
                 name="statusFilter"
                 [(ngModel)]="selectedStatus">
+
           <option value="All">All Requests</option>
           <option value="Pending">Pending</option>
           <option value="Approved">Approved</option>
           <option value="Rejected">Rejected</option>
           <option value="Cancelled">Cancelled</option>
+
         </select>
+
       </div>
+
     </div>
 
+    <!-- LOADING -->
     @if (loading()) {
-    <p class="loading-message">Loading leave requests...</p>
-    } @else if (filteredRequests().length === 0) {
-    <div class="empty-state">
-      <h3>No leave requests found</h3>
-      <p>There are no requests matching the selected filter.</p>
+
+    <div class="loading-state">
+      <div class="loader"></div>
+      <p>Loading employee leave records...</p>
     </div>
+
+    } @else if (filteredRequests().length === 0) {
+
+    <div class="empty-state">
+      <div class="empty-icon">▤</div>
+      <h3>No leave requests found</h3>
+      <p>There are currently no requests matching your search or filter.</p>
+    </div>
+
     } @else {
 
     <div class="table-container">
+
       <table>
+
         <thead>
           <tr>
-            <th>Employee</th>
-            <th>Leave Type</th>
-            <th>Start Date</th>
-            <th>End Date</th>
-            <th>Days</th>
-            <th>Status</th>
-            <th>Review</th>
+            <th>EMPLOYEE</th>
+            <th>LEAVE TYPE</th>
+            <th>START DATE</th>
+            <th>END DATE</th>
+            <th>DAYS</th>
+            <th>STATUS</th>
+            <th>REVIEW ACTIONS</th>
           </tr>
         </thead>
 
         <tbody>
+
           @for (request of filteredRequests(); track request.id) {
+
           <tr>
-            <td>
-              <strong>{{ request.employeeName }}</strong>
-              <small>Request #{{ request.id }}</small>
+
+            <td class="employee-cell">
+              <div class="employee-avatar">
+                {{ employeeName(request.employeeId).charAt(0) }}
+              </div>
+
+              <div>
+                <strong>{{ employeeName(request.employeeId) }}</strong>
+                <small>
+                  {{ employeeNumber(request.employeeId) }}
+                </small>
+                <small>Request #{{ request.id }}</small>
+              </div>
             </td>
 
-            <td>{{ request.leaveType }}</td>
+            <td>
+              <span class="leave-type">
+                {{ request.leaveType }}
+              </span>
+            </td>
 
-            <td>{{ request.startDate | date:'mediumDate' }}</td>
+            <td>{{ request.startDate | date:'dd MMM yyyy' }}</td>
 
-            <td>{{ request.endDate | date:'mediumDate' }}</td>
+            <td>{{ request.endDate | date:'dd MMM yyyy' }}</td>
 
-            <td>{{ request.totalDays }}</td>
+            <td class="days-cell">
+              {{ request.totalDays }}
+              <small>days</small>
+            </td>
 
             <td>
-              <span class="status-badge" [ngClass]="request.status.toLowerCase()">
+              <span class="status-badge"
+                    [ngClass]="statusClass(request.status)">
                 {{ request.status }}
               </span>
             </td>
@@ -200,24 +576,28 @@
             <td class="actions-cell">
 
               @if (request.status === 'Pending') {
+
               <textarea class="review-input"
                         [name]="'review-' + request.id"
                         rows="2"
-                        placeholder="Review comments"
+                        placeholder="Optional review comments..."
                         [(ngModel)]="reviewComments[request.id]">
                     </textarea>
 
               <div class="action-buttons">
+
                 <button class="approve-button"
                         type="button"
+                        [disabled]="reviewerEmployeeId <= 0"
                         (click)="reviewRequest(request.id, 'Approved')">
-                  Approve
+                  ✓ Approve
                 </button>
 
                 <button class="reject-button"
                         type="button"
+                        [disabled]="reviewerEmployeeId <= 0"
                         (click)="reviewRequest(request.id, 'Rejected')">
-                  Reject
+                  × Reject
                 </button>
 
                 <button class="cancel-button"
@@ -225,26 +605,47 @@
                         (click)="cancelRequest(request.id)">
                   Cancel
                 </button>
-              </div>
-              } @else {
-              <span class="reviewer-name">
-                {{ request.reviewerName || 'No reviewer' }}
-              </span>
 
-              @if (request.reviewComments) {
-              <small>{{ request.reviewComments }}</small>
-              }
+              </div>
+
+              } @else {
+
+              <div class="review-details">
+                <strong>{{ request.reviewerName || 'No reviewer' }}</strong>
+
+                @if (request.reviewedAt) {
+                <small>
+                  {{ request.reviewedAt | date:'dd MMM yyyy' }}
+                </small>
+                }
+
+                @if (request.reviewComments) {
+                <small>{{ request.reviewComments }}</small>
+                }
+              </div>
+
               }
 
             </td>
+
           </tr>
+
           }
+
         </tbody>
+
       </table>
+
     </div>
 
     }
 
   </section>
+
+  <!-- FOOTER -->
+  <div class="page-footer">
+    <span>GAAMS · Human Resources Management</span>
+    <span>Employee Leave Administration</span>
+  </div>
 
 </div>

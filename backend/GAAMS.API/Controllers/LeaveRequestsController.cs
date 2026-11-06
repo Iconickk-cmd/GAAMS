@@ -1,5 +1,6 @@
 ﻿
 using GAAMS.API.DTOs;
+using GAAMS.Application.Interfaces;
 using GAAMS.Domain.Entities;
 using GAAMS.Infrastructure.Data;
 using Microsoft.AspNetCore.Mvc;
@@ -12,10 +13,14 @@ namespace GAAMS.API.Controllers
     public class LeaveRequestsController : ControllerBase
     {
         private readonly GAAMSDbContext _context;
+        private readonly ILeaveBalanceService _leaveBalanceService;
 
-        public LeaveRequestsController(GAAMSDbContext context)
+        public LeaveRequestsController(
+            GAAMSDbContext context,
+            ILeaveBalanceService leaveBalanceService)
         {
             _context = context;
+            _leaveBalanceService = leaveBalanceService;
         }
 
         // GET: api/LeaveRequests
@@ -31,7 +36,8 @@ namespace GAAMS.API.Controllers
                 {
                     l.Id,
                     l.EmployeeId,
-                    EmployeeName = l.Employee!.FirstName + " " + l.Employee.LastName,
+                    EmployeeName = l.Employee!.FirstName + " " +
+                                   l.Employee.LastName,
                     l.LeaveType,
                     l.StartDate,
                     l.EndDate,
@@ -95,7 +101,8 @@ namespace GAAMS.API.Controllers
 
         // GET: api/LeaveRequests/employee/2
         [HttpGet("employee/{employeeId:int}")]
-        public async Task<IActionResult> GetEmployeeLeaveRequests(int employeeId)
+        public async Task<IActionResult> GetEmployeeLeaveRequests(
+            int employeeId)
         {
             var employeeExists = await _context.Employees
                 .AnyAsync(e => e.Id == employeeId);
@@ -189,12 +196,16 @@ namespace GAAMS.API.Controllers
                 });
             }
 
+            var startDate = request.StartDate.Date;
+            var endDate = request.EndDate.Date;
+            var leaveType = request.LeaveType.Trim();
+
             var overlappingRequest = await _context.LeaveRequests
                 .AnyAsync(l =>
                     l.EmployeeId == request.EmployeeId &&
                     (l.Status == "Pending" || l.Status == "Approved") &&
-                    request.StartDate.Date <= l.EndDate &&
-                    request.EndDate.Date >= l.StartDate);
+                    startDate <= l.EndDate &&
+                    endDate >= l.StartDate);
 
             if (overlappingRequest)
             {
@@ -204,38 +215,111 @@ namespace GAAMS.API.Controllers
                 });
             }
 
-            var leaveRequest = new LeaveRequest
+            var totalDays = (endDate - startDate).Days + 1;
+
+            // Split the leave days across calendar years.
+            var yearlySegments = GetYearlyLeaveSegments(
+                startDate,
+                endDate);
+
+            // Check the balance for every year before creating the request.
+            foreach (var segment in yearlySegments)
             {
-                EmployeeId = request.EmployeeId,
-                LeaveType = request.LeaveType.Trim(),
-                StartDate = request.StartDate.Date,
-                EndDate = request.EndDate.Date,
-                TotalDays = (request.EndDate.Date -
-                             request.StartDate.Date).Days + 1,
-                Reason = request.Reason.Trim(),
-                Status = "Pending",
-                CreatedAt = DateTime.UtcNow
-            };
+                decimal remainingDays;
 
-            _context.LeaveRequests.Add(leaveRequest);
-
-            await _context.SaveChangesAsync();
-
-            return CreatedAtAction(
-                nameof(GetLeaveRequest),
-                new { id = leaveRequest.Id },
-                new
+                try
                 {
-                    message = "Leave request submitted successfully.",
-                    leaveRequest.Id,
-                    leaveRequest.EmployeeId,
-                    leaveRequest.LeaveType,
-                    leaveRequest.StartDate,
-                    leaveRequest.EndDate,
-                    leaveRequest.TotalDays,
-                    leaveRequest.Status,
-                    leaveRequest.CreatedAt
+                    remainingDays =
+                        await _leaveBalanceService.GetRemainingDaysAsync(
+                            request.EmployeeId,
+                            leaveType,
+                            segment.Year);
+                }
+                catch (InvalidOperationException ex)
+                {
+                    return BadRequest(new
+                    {
+                        message = ex.Message,
+                        leaveYear = segment.Year
+                    });
+                }
+
+                if (remainingDays < segment.Days)
+                {
+                    return Conflict(new
+                    {
+                        message = "Insufficient leave balance.",
+                        leaveType,
+                        leaveYear = segment.Year,
+                        requestedDays = segment.Days,
+                        remainingDays
+                    });
+                }
+            }
+
+            await using var transaction =
+                await _context.Database.BeginTransactionAsync();
+
+            try
+            {
+                var leaveRequest = new LeaveRequest
+                {
+                    EmployeeId = request.EmployeeId,
+                    LeaveType = leaveType,
+                    StartDate = startDate,
+                    EndDate = endDate,
+                    TotalDays = totalDays,
+                    Reason = request.Reason.Trim(),
+                    Status = "Pending",
+                    CreatedAt = DateTime.UtcNow
+                };
+
+                _context.LeaveRequests.Add(leaveRequest);
+
+                await _context.SaveChangesAsync();
+
+                // Reserve the requested days in each year's balance.
+                foreach (var segment in yearlySegments)
+                {
+                    await _leaveBalanceService.UpdatePendingDaysAsync(
+                        request.EmployeeId,
+                        leaveType,
+                        segment.Year,
+                        segment.Days);
+                }
+
+                await transaction.CommitAsync();
+
+                return CreatedAtAction(
+                    nameof(GetLeaveRequest),
+                    new { id = leaveRequest.Id },
+                    new
+                    {
+                        message = "Leave request submitted successfully.",
+                        leaveRequest.Id,
+                        leaveRequest.EmployeeId,
+                        leaveRequest.LeaveType,
+                        leaveRequest.StartDate,
+                        leaveRequest.EndDate,
+                        leaveRequest.TotalDays,
+                        leaveRequest.Status,
+                        leaveRequest.CreatedAt
+                    });
+            }
+            catch (InvalidOperationException ex)
+            {
+                await transaction.RollbackAsync();
+
+                return Conflict(new
+                {
+                    message = ex.Message
                 });
+            }
+            catch
+            {
+                await transaction.RollbackAsync();
+                throw;
+            }
         }
 
         // PUT: api/LeaveRequests/5/review
@@ -272,20 +356,22 @@ namespace GAAMS.API.Controllers
                 });
             }
 
-            var reviewer = await _context.Employees
-                .FirstOrDefaultAsync(e =>
-                    e.Id == request.ReviewedByEmployeeId);
-
-            if (reviewer == null || !reviewer.IsActive)
-            {
-                return BadRequest(new
-                {
-                    message = "A valid active reviewing employee is required."
-                });
-            }
-
+            // Validate the employee requesting leave when approving.
             if (request.Status == "Approved")
             {
+                var employee = await _context.Employees
+                    .FirstOrDefaultAsync(e =>
+                        e.Id == leaveRequest.EmployeeId);
+
+                if (employee == null || !employee.IsActive)
+                {
+                    return BadRequest(new
+                    {
+                        message = "Leave cannot be approved for an inactive employee."
+                    });
+                }
+
+                // Check for conflicting approved leave.
                 var conflictingRequest = await _context.LeaveRequests
                     .AnyAsync(l =>
                         l.Id != id &&
@@ -303,27 +389,88 @@ namespace GAAMS.API.Controllers
                 }
             }
 
-            leaveRequest.Status = request.Status;
-            leaveRequest.ReviewedByEmployeeId =
-                request.ReviewedByEmployeeId;
-            leaveRequest.ReviewedAt = DateTime.UtcNow;
-            leaveRequest.ReviewComments =
-                string.IsNullOrWhiteSpace(request.ReviewComments)
-                    ? null
-                    : request.ReviewComments.Trim();
-            leaveRequest.UpdatedAt = DateTime.UtcNow;
+            // Validate the reviewing employee.
+            var reviewer = await _context.Employees
+                .FirstOrDefaultAsync(e =>
+                    e.Id == request.ReviewedByEmployeeId);
 
-            await _context.SaveChangesAsync();
-
-            return Ok(new
+            if (reviewer == null || !reviewer.IsActive)
             {
-                message = $"Leave request {request.Status.ToLower()} successfully.",
-                leaveRequest.Id,
-                leaveRequest.Status,
-                leaveRequest.ReviewedByEmployeeId,
-                leaveRequest.ReviewedAt,
-                leaveRequest.ReviewComments
-            });
+                return BadRequest(new
+                {
+                    message = "A valid active reviewing employee is required."
+                });
+            }
+
+            var yearlySegments = GetYearlyLeaveSegments(
+                leaveRequest.StartDate.Date,
+                leaveRequest.EndDate.Date);
+
+            await using var transaction =
+                await _context.Database.BeginTransactionAsync();
+
+            try
+            {
+                // Update the request status.
+                leaveRequest.Status = request.Status;
+                leaveRequest.ReviewedByEmployeeId =
+                    request.ReviewedByEmployeeId;
+                leaveRequest.ReviewedAt = DateTime.UtcNow;
+                leaveRequest.ReviewComments =
+                    string.IsNullOrWhiteSpace(request.ReviewComments)
+                        ? null
+                        : request.ReviewComments.Trim();
+                leaveRequest.UpdatedAt = DateTime.UtcNow;
+
+                await _context.SaveChangesAsync();
+
+                // Update the corresponding yearly balances.
+                foreach (var segment in yearlySegments)
+                {
+                    if (request.Status == "Approved")
+                    {
+                        await _leaveBalanceService.ApproveLeaveAsync(
+                            leaveRequest.EmployeeId,
+                            leaveRequest.LeaveType,
+                            segment.Year,
+                            segment.Days);
+                    }
+                    else
+                    {
+                        await _leaveBalanceService.ReleasePendingDaysAsync(
+                            leaveRequest.EmployeeId,
+                            leaveRequest.LeaveType,
+                            segment.Year,
+                            segment.Days);
+                    }
+                }
+
+                await transaction.CommitAsync();
+
+                return Ok(new
+                {
+                    message = $"Leave request {request.Status.ToLower()} successfully.",
+                    leaveRequest.Id,
+                    leaveRequest.Status,
+                    leaveRequest.ReviewedByEmployeeId,
+                    leaveRequest.ReviewedAt,
+                    leaveRequest.ReviewComments
+                });
+            }
+            catch (InvalidOperationException ex)
+            {
+                await transaction.RollbackAsync();
+
+                return Conflict(new
+                {
+                    message = ex.Message
+                });
+            }
+            catch
+            {
+                await transaction.RollbackAsync();
+                throw;
+            }
         }
 
         // DELETE: api/LeaveRequests/5
@@ -349,17 +496,95 @@ namespace GAAMS.API.Controllers
                 });
             }
 
-            leaveRequest.Status = "Cancelled";
-            leaveRequest.UpdatedAt = DateTime.UtcNow;
+            var yearlySegments = GetYearlyLeaveSegments(
+                leaveRequest.StartDate.Date,
+                leaveRequest.EndDate.Date);
 
-            await _context.SaveChangesAsync();
+            await using var transaction =
+                await _context.Database.BeginTransactionAsync();
 
-            return Ok(new
+            try
             {
-                message = "Leave request cancelled successfully.",
-                leaveRequest.Id,
-                leaveRequest.Status
-            });
+                leaveRequest.Status = "Cancelled";
+                leaveRequest.UpdatedAt = DateTime.UtcNow;
+
+                await _context.SaveChangesAsync();
+
+                // Release the reserved days from each year's balance.
+                foreach (var segment in yearlySegments)
+                {
+                    await _leaveBalanceService.ReleasePendingDaysAsync(
+                        leaveRequest.EmployeeId,
+                        leaveRequest.LeaveType,
+                        segment.Year,
+                        segment.Days);
+                }
+
+                await transaction.CommitAsync();
+
+                return Ok(new
+                {
+                    message = "Leave request cancelled successfully.",
+                    leaveRequest.Id,
+                    leaveRequest.Status
+                });
+            }
+            catch (InvalidOperationException ex)
+            {
+                await transaction.RollbackAsync();
+
+                return Conflict(new
+                {
+                    message = ex.Message
+                });
+            }
+            catch
+            {
+                await transaction.RollbackAsync();
+                throw;
+            }
+        }
+
+        // Splits a leave request into calendar-year segments.
+        private static List<YearlyLeaveSegment> GetYearlyLeaveSegments(
+            DateTime startDate,
+            DateTime endDate)
+        {
+            var segments = new List<YearlyLeaveSegment>();
+
+            var currentStart = startDate.Date;
+
+            while (currentStart <= endDate.Date)
+            {
+                var year = currentStart.Year;
+
+                var yearEnd = new DateTime(
+                    year,
+                    12,
+                    31);
+
+                var segmentEnd = endDate.Date < yearEnd
+                    ? endDate.Date
+                    : yearEnd;
+
+                var days = (segmentEnd - currentStart).Days + 1;
+
+                segments.Add(new YearlyLeaveSegment
+                {
+                    Year = year,
+                    Days = days
+                });
+
+                currentStart = segmentEnd.AddDays(1);
+            }
+
+            return segments;
+        }
+
+        private class YearlyLeaveSegment
+        {
+            public int Year { get; set; }
+            public decimal Days { get; set; }
         }
     }
 }

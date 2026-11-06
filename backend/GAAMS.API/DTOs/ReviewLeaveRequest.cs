@@ -5,7 +5,8 @@ namespace GAAMS.API.DTOs
 {
     public class ReviewLeaveRequest
     {
-        [Required]
+        [Range(1, int.MaxValue,
+            ErrorMessage = "A valid reviewing employee ID is required.")]
         public int ReviewedByEmployeeId { get; set; }
 
         [Required]
